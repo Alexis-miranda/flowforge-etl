@@ -101,6 +101,12 @@ public class PipelineExecutionContext {
 
         return data.remove(key);
     }
+    /**
+     * Removes all entries from the execution context.
+     */
+    public void clear() {
+        data.clear();
+    }
 
     /**
      * Returns an unmodifiable view of the stored data.

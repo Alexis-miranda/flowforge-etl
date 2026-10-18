@@ -160,4 +160,28 @@ class PipelineExecutionContextTest {
                 () -> context.remove("   ")
         );
     }
+    @Test
+    void shouldRemoveAllEntriesWhenClearingContext() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("name", "FlowForge");
+        context.put("count", 42);
+
+        context.clear();
+
+        assertFalse(context.contains("name"));
+        assertFalse(context.contains("count"));
+        assertTrue(context.asMap().isEmpty());
+    }
+
+    @Test
+    void shouldAllowStoringValuesAfterClearingContext() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("name", "FlowForge");
+
+        context.clear();
+        context.put("status", "ready");
+
+        assertFalse(context.contains("name"));
+        assertEquals("ready", context.get("status"));
+    }
 }
