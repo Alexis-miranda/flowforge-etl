@@ -36,8 +36,8 @@ class PipelineExecutorTest {
 
         assertEquals(PipelineStatus.SUCCEEDED, result.status());
         assertEquals("test-pipeline", result.pipelineId());
-        assertEquals(null, result.failedStepId());
-        assertEquals(null, result.errorMessage());
+        assertNull(result.failedStepId());
+        assertNull(result.errorMessage());
         assertEquals(List.of("extract", "transform"), executedSteps);
     }
 
@@ -88,7 +88,9 @@ class PipelineExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 executedSteps.add(step.id());
                 throw new IllegalStateException("Extraction failed");
             }
@@ -122,7 +124,9 @@ class PipelineExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 throw new IllegalStateException();
             }
         };
@@ -141,6 +145,7 @@ class PipelineExecutorTest {
         assertEquals("extract", result.failedStepId());
         assertEquals("IllegalStateException", result.errorMessage());
     }
+
     @Test
     void shouldRejectDuplicateExecutorTypes() {
         StepExecutor firstExecutor = createExecutor(
@@ -194,7 +199,9 @@ class PipelineExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 // No operation required for this validation test.
             }
         };
@@ -204,6 +211,7 @@ class PipelineExecutorTest {
                 () -> new PipelineExecutor(List.of(executor))
         );
     }
+
     @Test
     void shouldNotifyStatusChangesWhenPipelineSucceeds() {
         List<PipelineStatus> receivedStatuses = new ArrayList<>();
@@ -252,7 +260,9 @@ class PipelineExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 throw new IllegalStateException("Extraction failed");
             }
         };
@@ -287,12 +297,12 @@ class PipelineExecutorTest {
                 receivedStatuses
         );
     }
+
     @Test
     void shouldContinueExecutionWhenListenerThrowsException() {
         PipelineExecutionListener listener =
                 (pipelineId, status) -> {
-                    throw new IllegalStateException(
-                            "Listener failed");
+                    throw new IllegalStateException("Listener failed");
                 };
 
         PipelineExecutor executor = new PipelineExecutor(
@@ -353,10 +363,60 @@ class PipelineExecutorTest {
 
         assertEquals("test-pipeline", result.pipelineId());
         assertEquals(PipelineStatus.SUCCEEDED, result.status());
-        assertTrue(result.executionId() != null && !result.executionId().isBlank());
-        assertTrue(result.startedAt() != null);
-        assertTrue(result.finishedAt() != null);
-        assertTrue(!result.duration().isNegative());
+        assertTrue(
+                result.executionId() != null
+                        && !result.executionId().isBlank()
+        );
+        assertNotNull(result.startedAt());
+        assertNotNull(result.finishedAt());
+        assertFalse(result.duration().isNegative());
+    }
+
+    @Test
+    void shouldShareContextBetweenSteps() {
+        StepExecutor extractExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                context.put("records", List.of("record-1", "record-2"));
+            }
+        };
+
+        StepExecutor transformExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.TRANSFORM;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                assertEquals(
+                        List.of("record-1", "record-2"),
+                        context.get("records")
+                );
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(extractExecutor, transformExecutor)
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1),
+                createStep("transform", StepType.TRANSFORM, 2)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
     }
 
     private StepExecutor createExecutor(
@@ -370,7 +430,9 @@ class PipelineExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 executedSteps.add(step.id());
             }
         };

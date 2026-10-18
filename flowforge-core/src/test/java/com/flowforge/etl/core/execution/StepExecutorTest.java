@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineStep;
@@ -8,8 +7,8 @@ import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class StepExecutorTest {
 
@@ -22,7 +21,9 @@ class StepExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 // No operation required for this contract test.
             }
         };
@@ -39,7 +40,9 @@ class StepExecutorTest {
             }
 
             @Override
-            public void execute(PipelineStep step) {
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
                 assertEquals("extract-customers", step.id());
             }
         };
@@ -52,6 +55,9 @@ class StepExecutorTest {
                 new StepConfiguration(Map.of())
         );
 
-        assertDoesNotThrow(() -> executor.execute(step));
+        PipelineExecutionContext context =
+                new PipelineExecutionContext();
+
+        assertDoesNotThrow(() -> executor.execute(step, context));
     }
 }

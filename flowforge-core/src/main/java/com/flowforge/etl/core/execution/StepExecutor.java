@@ -17,9 +17,10 @@ public interface StepExecutor {
     StepType supportedType();
 
     /**
-     * Executes the given pipeline step.
+     * Executes the given pipeline step using the shared execution context.
      *
      * @param step the pipeline step to execute
+     * @param context the shared context for the pipeline execution
      */
-    void execute(PipelineStep step);
+    void execute(PipelineStep step, PipelineExecutionContext context);
 }

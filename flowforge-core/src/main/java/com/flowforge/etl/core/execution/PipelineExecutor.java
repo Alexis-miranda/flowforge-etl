@@ -1,4 +1,5 @@
 
+
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineDefinition;
@@ -90,6 +91,9 @@ public class PipelineExecutor {
         PipelineExecution execution =
                 new PipelineExecution(pipeline.id());
 
+        PipelineExecutionContext context =
+                new PipelineExecutionContext();
+
         notifyStatus(pipeline.id(), execution.status());
 
         for (PipelineStep step : pipeline.steps()) {
@@ -107,7 +111,7 @@ public class PipelineExecutor {
             }
 
             try {
-                executor.execute(step);
+                executor.execute(step, context);
             } catch (RuntimeException exception) {
                 String errorMessage = exception.getMessage();
 
