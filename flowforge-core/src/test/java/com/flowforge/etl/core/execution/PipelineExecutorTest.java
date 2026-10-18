@@ -260,6 +260,30 @@ class PipelineExecutorTest {
                 receivedStatuses
         );
     }
+    @Test
+    void shouldContinueExecutionWhenListenerThrowsException() {
+        PipelineExecutionListener listener =
+                (pipelineId, status) -> {
+                    throw new IllegalStateException(
+                            "Listener failed");
+                };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                listener
+        );
+
+        PipelineDefinition pipeline = new PipelineDefinition(
+                "pipeline-1",
+                "Test pipeline",
+                "Pipeline used for testing",
+                List.of()
+        );
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+    }
 
     private StepExecutor createExecutor(
             StepType type,

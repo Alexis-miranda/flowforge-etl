@@ -138,9 +138,22 @@ public class PipelineExecutor {
         );
     }
 
+    /**
+     * Notifies the listener without interrupting pipeline execution
+     * if the listener fails.
+     *
+     * @param pipelineId the identifier of the pipeline
+     * @param status the new execution status
+     */
     private void notifyStatus(String pipelineId, PipelineStatus status) {
-        if (listener != null) {
+        if (listener == null) {
+            return;
+        }
+
+        try {
             listener.onStatusChanged(pipelineId, status);
+        } catch (RuntimeException exception) {
+            // Listener failures must not interrupt pipeline execution.
         }
     }
 }
