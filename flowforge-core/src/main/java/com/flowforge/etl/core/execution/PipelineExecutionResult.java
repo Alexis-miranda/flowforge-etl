@@ -2,6 +2,7 @@
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineStatus;
+import java.time.Duration;
 
 import java.time.Instant;
 
@@ -80,5 +81,14 @@ public record PipelineExecutionResult(
      */
     public boolean succeeded() {
         return status == PipelineStatus.SUCCEEDED;
+    }
+
+    /**
+     * Calculates the total execution duration.
+     *
+     * @return the execution duration
+     */
+    public Duration duration() {
+        return Duration.between(startedAt, finishedAt);
     }
 }

@@ -172,4 +172,22 @@ class PipelineExecutionResultTest {
                 )
         );
     }
+
+    @Test
+    void shouldCalculateExecutionDuration() {
+        PipelineExecutionResult result = new PipelineExecutionResult(
+                EXECUTION_ID,
+                PIPELINE_ID,
+                PipelineStatus.SUCCEEDED,
+                null,
+                null,
+                STARTED_AT,
+                FINISHED_AT
+        );
+
+        assertEquals(
+                java.time.Duration.ofSeconds(5),
+                result.duration()
+        );
+    }
 }
