@@ -177,6 +177,89 @@ class PipelineExecutorTest {
                 () -> new PipelineExecutor(List.of(executor))
         );
     }
+    @Test
+    void shouldNotifyStatusChangesWhenPipelineSucceeds() {
+        List<PipelineStatus> receivedStatuses = new ArrayList<>();
+
+        PipelineExecutionListener listener =
+                (pipelineId, status) -> {
+                    assertEquals("pipeline-1", pipelineId);
+                    receivedStatuses.add(status);
+                };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                listener
+        );
+
+        PipelineDefinition pipeline = new PipelineDefinition(
+                "pipeline-1",
+                "Test pipeline",
+                "Pipeline used for testing",
+                List.of()
+        );
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(
+                List.of(
+                        PipelineStatus.RUNNING,
+                        PipelineStatus.SUCCEEDED
+                ),
+                receivedStatuses
+        );
+    }
+
+    @Test
+    void shouldNotifyStatusChangesWhenPipelineFails() {
+        List<PipelineStatus> receivedStatuses = new ArrayList<>();
+
+        PipelineExecutionListener listener =
+                (pipelineId, status) -> receivedStatuses.add(status);
+
+        StepExecutor extractExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(PipelineStep step) {
+                throw new IllegalStateException("Extraction failed");
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(extractExecutor),
+                listener
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract",
+                "Extract data",
+                StepType.EXTRACT,
+                1
+        );
+
+        PipelineDefinition pipeline = new PipelineDefinition(
+                "pipeline-1",
+                "Test pipeline",
+                "Pipeline used for testing",
+                List.of(step)
+        );
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals(
+                List.of(
+                        PipelineStatus.RUNNING,
+                        PipelineStatus.FAILED
+                ),
+                receivedStatuses
+        );
+    }
 
     private StepExecutor createExecutor(
             StepType type,

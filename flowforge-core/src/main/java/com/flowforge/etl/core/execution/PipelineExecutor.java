@@ -16,15 +16,27 @@ import java.util.Map;
 public class PipelineExecutor {
 
     private final Map<StepType, StepExecutor> executors;
+    private final PipelineExecutionListener listener;
 
     /**
-     * Creates a pipeline executor using the provided step executors.
+     * Creates a pipeline executor without a status listener.
      *
      * @param stepExecutors the available step executors
-     * @throws IllegalArgumentException if the list is null, contains null
-     *                                  executors, or has duplicate step types
      */
     public PipelineExecutor(List<StepExecutor> stepExecutors) {
+        this(stepExecutors, null);
+    }
+
+    /**
+     * Creates a pipeline executor with a status listener.
+     *
+     * @param stepExecutors the available step executors
+     * @param listener the listener for execution status changes
+     */
+    public PipelineExecutor(
+            List<StepExecutor> stepExecutors,
+            PipelineExecutionListener listener) {
+
         if (stepExecutors == null) {
             throw new IllegalArgumentException(
                     "Step executors must not be null");
@@ -54,6 +66,7 @@ public class PipelineExecutor {
         }
 
         this.executors = Map.copyOf(executorMap);
+        this.listener = listener;
     }
 
     /**
@@ -69,13 +82,14 @@ public class PipelineExecutor {
                     "Pipeline must not be null");
         }
 
+        notifyStatus(pipeline.id(), PipelineStatus.RUNNING);
+
         for (PipelineStep step : pipeline.steps()) {
             StepExecutor executor = executors.get(step.type());
 
             if (executor == null) {
-                return new PipelineExecutionResult(
+                return failedResult(
                         pipeline.id(),
-                        PipelineStatus.FAILED,
                         step.id(),
                         "No executor registered for step type: "
                                 + step.type()
@@ -91,14 +105,15 @@ public class PipelineExecutor {
                     errorMessage = exception.getClass().getSimpleName();
                 }
 
-                return new PipelineExecutionResult(
+                return failedResult(
                         pipeline.id(),
-                        PipelineStatus.FAILED,
                         step.id(),
                         errorMessage
                 );
             }
         }
+
+        notifyStatus(pipeline.id(), PipelineStatus.SUCCEEDED);
 
         return new PipelineExecutionResult(
                 pipeline.id(),
@@ -107,4 +122,26 @@ public class PipelineExecutor {
                 null
         );
     }
+
+    private PipelineExecutionResult failedResult(
+            String pipelineId,
+            String failedStepId,
+            String errorMessage) {
+
+        notifyStatus(pipelineId, PipelineStatus.FAILED);
+
+        return new PipelineExecutionResult(
+                pipelineId,
+                PipelineStatus.FAILED,
+                failedStepId,
+                errorMessage
+        );
+    }
+
+    private void notifyStatus(String pipelineId, PipelineStatus status) {
+        if (listener != null) {
+            listener.onStatusChanged(pipelineId, status);
+        }
+    }
 }
+
