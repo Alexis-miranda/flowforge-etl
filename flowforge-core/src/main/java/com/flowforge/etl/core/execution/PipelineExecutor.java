@@ -5,6 +5,8 @@ import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import java.util.HashMap;
 import java.util.List;
@@ -15,6 +17,8 @@ import java.util.Map;
  */
 public class PipelineExecutor {
 
+    private static final Logger LOGGER =
+            Logger.getLogger(PipelineExecutor.class.getName());
     private final Map<StepType, StepExecutor> executors;
     private final PipelineExecutionListener listener;
 
@@ -138,6 +142,7 @@ public class PipelineExecutor {
         );
     }
 
+
     /**
      * Notifies the listener without interrupting pipeline execution
      * if the listener fails.
@@ -153,7 +158,14 @@ public class PipelineExecutor {
         try {
             listener.onStatusChanged(pipelineId, status);
         } catch (RuntimeException exception) {
-            // Listener failures must not interrupt pipeline execution.
+            LOGGER.log(
+                    Level.WARNING,
+                    "Pipeline status listener failed for pipeline "
+                            + pipelineId
+                            + " while notifying status "
+                            + status,
+                    exception
+            );
         }
     }
 }
