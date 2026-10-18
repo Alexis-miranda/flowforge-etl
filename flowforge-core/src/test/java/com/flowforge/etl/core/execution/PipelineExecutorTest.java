@@ -11,8 +11,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class PipelineExecutorTest {
 
@@ -342,6 +341,22 @@ class PipelineExecutorTest {
                 ),
                 receivedStatuses
         );
+    }
+
+    @Test
+    void shouldReturnExecutionMetadata() {
+        PipelineExecutor executor = new PipelineExecutor(List.of());
+
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals("test-pipeline", result.pipelineId());
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertTrue(result.executionId() != null && !result.executionId().isBlank());
+        assertTrue(result.startedAt() != null);
+        assertTrue(result.finishedAt() != null);
+        assertTrue(!result.duration().isNegative());
     }
 
     private StepExecutor createExecutor(
