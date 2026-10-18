@@ -23,6 +23,7 @@ public class CsvLoader implements StepExecutor {
 
     private static final String PATH_PROPERTY = "path";
     private static final String INPUT_KEY_PROPERTY = "inputKey";
+    private static final String DELIMITER_PROPERTY = "delimiter";
 
     /**
      * Returns the type of step supported by this executor.
@@ -48,6 +49,9 @@ public class CsvLoader implements StepExecutor {
         String filePath = getRequiredProperty(step, PATH_PROPERTY);
         String inputKey = getRequiredProperty(step, INPUT_KEY_PROPERTY);
 
+        String delimiterValue = step.configuration().get(DELIMITER_PROPERTY);
+        char delimiter = resolveDelimiter(delimiterValue);
+
         Object input = context.get(inputKey);
 
         if (!(input instanceof List<?> records)) {
@@ -56,7 +60,7 @@ public class CsvLoader implements StepExecutor {
             );
         }
 
-        writeCsv(filePath, records);
+        writeCsv(filePath, records, delimiter);
     }
 
     /**
@@ -79,12 +83,36 @@ public class CsvLoader implements StepExecutor {
     }
 
     /**
+     * Resolves the configured CSV delimiter.
+     *
+     * @param value the configured delimiter
+     * @return the delimiter character, defaulting to comma
+     */
+    private char resolveDelimiter(String value) {
+        if (value == null || value.isBlank()) {
+            return ',';
+        }
+
+        if (value.length() != 1) {
+            throw new IllegalArgumentException(
+                    "Delimiter must be a single character"
+            );
+        }
+
+        return value.charAt(0);
+    }
+
+    /**
      * Writes records using their map keys as CSV headers.
      *
      * @param filePath the output file path
      * @param records the records to write
      */
-    private void writeCsv(String filePath, List<?> records) {
+    private void writeCsv(
+            String filePath,
+            List<?> records,
+            char delimiter
+    ) {
         if (records.isEmpty()) {
             throw new IllegalArgumentException(
                     "Cannot write CSV without records or headers"
@@ -122,6 +150,7 @@ public class CsvLoader implements StepExecutor {
                     CSVPrinter printer = new CSVPrinter(
                             writer,
                             CSVFormat.RFC4180.builder()
+                                    .setDelimiter(delimiter)
                                     .setHeader(headers.toArray(String[]::new))
                                     .get()
                     )

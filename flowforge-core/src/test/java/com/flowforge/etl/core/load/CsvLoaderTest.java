@@ -76,7 +76,87 @@ class CsvLoaderTest {
 
         assertTrue(Files.exists(outputFile));
     }
+    @Test
+    void shouldWriteRecordsUsingConfiguredDelimiter() throws IOException {
+        Path outputFile = tempDir.resolve("customers-semicolon.csv");
 
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("customers", List.of(
+                Map.of("name", "Ana", "city", "Geneva"),
+                Map.of("name", "Carlos", "city", "Madrid")
+        ));
+
+        PipelineStep step = new PipelineStep(
+                "load-customers",
+                "Load customers",
+                StepType.LOAD,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", outputFile.toString(),
+                        "inputKey", "customers",
+                        "delimiter", ";"
+                ))
+        );
+
+        loader.execute(step, context);
+       // System.out.println(Files.readString(outputFile));
+
+        try (CSVParser parser = CSVParser.parse(
+                outputFile,
+                java.nio.charset.StandardCharsets.UTF_8,
+                CSVFormat.RFC4180.builder()
+                        .setDelimiter(';')
+                        .setHeader()
+                        .setSkipHeaderRecord(true)
+                        .get()
+        )) {
+            List<CSVRecord> records = parser.getRecords();
+
+            assertEquals(
+                    List.of("city", "name"),
+                    parser.getHeaderNames().stream().sorted().toList()
+            );
+            assertEquals(2, records.size());
+
+            assertEquals("Ana", records.get(0).get("name"));
+            assertEquals("Geneva", records.get(0).get("city"));
+            assertEquals("Carlos", records.get(1).get("name"));
+            assertEquals("Madrid", records.get(1).get("city"));
+        }
+    }
+
+
+    @Test
+    void shouldRejectDelimiterWithMoreThanOneCharacter() {
+        Path outputFile = tempDir.resolve("customers.csv");
+
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("customers", List.of(
+                Map.of("name", "Ana", "city", "Geneva")
+        ));
+
+        PipelineStep step = new PipelineStep(
+                "load-customers",
+                "Load customers",
+                StepType.LOAD,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", outputFile.toString(),
+                        "inputKey", "customers",
+                        "delimiter", ";;"
+                ))
+        );
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> loader.execute(step, context)
+        );
+
+        assertEquals(
+                "Delimiter must be a single character",
+                exception.getMessage()
+        );
+    }
     @Test
     void shouldEscapeValuesContainingCommas() throws IOException {
         Path outputFile = tempDir.resolve("customers.csv");

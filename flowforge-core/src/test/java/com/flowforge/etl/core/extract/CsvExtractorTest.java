@@ -108,7 +108,76 @@ class CsvExtractorTest {
         );
     }
 
+    @Test
+    void shouldExtractCsvRecordsUsingConfiguredDelimiter() throws Exception {
+        Path csvFile = tempDir.resolve("customers-semicolon.csv");
 
+        Files.writeString(
+                csvFile,
+                "name;city\nAna;Geneva\nLuis;Madrid\n"
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", csvFile.toString(),
+                        "outputKey", "customers",
+                        "delimiter", ";"
+                ))
+        );
+
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        CsvExtractor extractor = new CsvExtractor();
+
+        extractor.execute(step, context);
+
+        List<?> result = (List<?>) context.get("customers");
+
+        assertEquals(2, result.size());
+        assertEquals(
+                Map.of("name", "Ana", "city", "Geneva"),
+                result.get(0)
+        );
+        assertEquals(
+                Map.of("name", "Luis", "city", "Madrid"),
+                result.get(1)
+        );
+    }
+
+
+    @Test
+    void shouldRejectDelimiterWithMoreThanOneCharacter() {
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", "customers.csv",
+                        "outputKey", "customers",
+                        "delimiter", ";;"
+                ))
+        );
+
+        PipelineExecutionContext context =
+                new PipelineExecutionContext();
+
+        CsvExtractor extractor = new CsvExtractor();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> extractor.execute(step, context)
+        );
+
+        assertEquals(
+                "Delimiter must be a single character",
+                exception.getMessage()
+        );
+    }
     @Test
     void shouldRejectMissingPathConfiguration() {
         PipelineStep step = new PipelineStep(
@@ -258,6 +327,76 @@ class CsvExtractorTest {
         assertTrue(
                 verifier.recordsVerified,
                 "The verification step should inspect the extracted records"
+        );
+    }
+
+    @Test
+    void shouldExtractCsvRecordsWhenRequiredHeadersArePresent() throws Exception {
+        Path csvFile = tempDir.resolve("customers-required-headers.csv");
+
+        Files.writeString(
+                csvFile,
+                "name,city\nAna,Geneva\n"
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", csvFile.toString(),
+                        "outputKey", "customers",
+                        "requiredHeaders", "name,city"
+                ))
+        );
+
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        CsvExtractor extractor = new CsvExtractor();
+
+        extractor.execute(step, context);
+
+        List<?> result = (List<?>) context.get("customers");
+
+        assertEquals(1, result.size());
+        assertEquals(
+                Map.of("name", "Ana", "city", "Geneva"),
+                result.get(0)
+        );
+    }
+
+    @Test
+    void shouldRejectCsvWhenRequiredHeaderIsMissing() throws Exception {
+        Path csvFile = tempDir.resolve("customers-missing-header.csv");
+
+        Files.writeString(
+                csvFile,
+                "name,city\nAna,Geneva\n"
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", csvFile.toString(),
+                        "outputKey", "customers",
+                        "requiredHeaders", "name,country"
+                ))
+        );
+
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        CsvExtractor extractor = new CsvExtractor();
+
+        IllegalArgumentException exception = assertThrows(
+                IllegalArgumentException.class,
+                () -> extractor.execute(step, context)
+        );
+
+        assertEquals(
+                "Missing required CSV headers: [country]",
+                exception.getMessage()
         );
     }
     private static class RecordVerificationExecutor
