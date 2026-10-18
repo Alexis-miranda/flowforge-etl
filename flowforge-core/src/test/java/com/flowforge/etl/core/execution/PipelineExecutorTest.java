@@ -458,7 +458,15 @@ class PipelineExecutorTest {
         assertNotSame(receivedContexts.get(0), receivedContexts.get(1));
 
     }
-
+    @Test
+    void shouldRejectNullExecutorList() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutor(
+                        (List<StepExecutor>) null
+                )
+        );
+    }
 
 
 
