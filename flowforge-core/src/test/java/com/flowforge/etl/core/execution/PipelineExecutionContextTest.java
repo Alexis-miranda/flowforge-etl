@@ -5,9 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 class PipelineExecutionContextTest {
 
@@ -97,6 +95,30 @@ class PipelineExecutionContextTest {
         assertThrows(
                 IllegalArgumentException.class,
                 () -> context.get("name", null)
+        );
+    }
+    @Test
+    void shouldReturnTrueWhenKeyExists() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("records", List.of("record-1", "record-2"));
+
+        assertTrue(context.contains("records"));
+    }
+
+    @Test
+    void shouldReturnFalseWhenKeyDoesNotExist() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertFalse(context.contains("missing"));
+    }
+
+    @Test
+    void shouldRejectNullKeyWhenCheckingExistence() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.contains(null)
         );
     }
 }

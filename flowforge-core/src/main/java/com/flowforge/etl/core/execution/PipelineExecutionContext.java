@@ -71,7 +71,21 @@ public class PipelineExecutionContext {
 
         return type.cast(value);
     }
+    /**
+     * Checks whether the execution context contains the given key.
+     *
+     * @param key the data key
+     * @return true if the key exists, false otherwise
+     * @throws IllegalArgumentException if the key is null or blank
+     */
+    public boolean contains(String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Context key must not be blank");
+        }
 
+        return data.containsKey(key);
+    }
 
     /**
      * Returns an unmodifiable view of the stored data.
