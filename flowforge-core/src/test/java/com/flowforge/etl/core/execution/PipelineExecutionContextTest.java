@@ -4,6 +4,7 @@ package com.flowforge.etl.core.execution;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -204,6 +205,20 @@ class PipelineExecutionContextTest {
                 IllegalArgumentException.class,
                 () -> context.put("optional", null)
         );
+    }
+
+    @Test
+    void shouldReflectContextChangesInExistingMapView() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        Map<String, Object> view = context.asMap();
+
+        context.put("name", "FlowForge");
+
+        assertEquals("FlowForge", view.get("name"));
+
+        context.remove("name");
+
+        assertFalse(view.containsKey("name"));
     }
 
 }
