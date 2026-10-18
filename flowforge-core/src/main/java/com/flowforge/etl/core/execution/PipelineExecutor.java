@@ -6,10 +6,9 @@ import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 /**
  * Executes the steps defined in a pipeline.
@@ -22,6 +21,8 @@ public class PipelineExecutor {
      * Creates a pipeline executor using the provided step executors.
      *
      * @param stepExecutors the available step executors
+     * @throws IllegalArgumentException if the list is null, contains null
+     *                                  executors, or has duplicate step types
      */
     public PipelineExecutor(List<StepExecutor> stepExecutors) {
         if (stepExecutors == null) {
@@ -29,11 +30,30 @@ public class PipelineExecutor {
                     "Step executors must not be null");
         }
 
-        this.executors = stepExecutors.stream()
-                .collect(Collectors.toMap(
-                        StepExecutor::supportedType,
-                        Function.identity()
-                ));
+        Map<StepType, StepExecutor> executorMap = new HashMap<>();
+
+        for (StepExecutor executor : stepExecutors) {
+            if (executor == null) {
+                throw new IllegalArgumentException(
+                        "Step executors must not contain null elements");
+            }
+
+            StepType type = executor.supportedType();
+
+            if (type == null) {
+                throw new IllegalArgumentException(
+                        "Executor supported type must not be null");
+            }
+
+            if (executorMap.containsKey(type)) {
+                throw new IllegalArgumentException(
+                        "Duplicate executor for step type: " + type);
+            }
+
+            executorMap.put(type, executor);
+        }
+
+        this.executors = Map.copyOf(executorMap);
     }
 
     /**
@@ -41,6 +61,7 @@ public class PipelineExecutor {
      *
      * @param pipeline the pipeline definition
      * @return the detailed execution result
+     * @throws IllegalArgumentException if the pipeline is null
      */
     public PipelineExecutionResult execute(PipelineDefinition pipeline) {
         if (pipeline == null) {

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class PipelineExecutorTest {
 
@@ -111,6 +112,70 @@ class PipelineExecutorTest {
         assertEquals("extract", result.failedStepId());
         assertEquals("Extraction failed", result.errorMessage());
         assertEquals(List.of("extract"), executedSteps);
+    }
+
+    @Test
+    void shouldRejectDuplicateExecutorTypes() {
+        StepExecutor firstExecutor = createExecutor(
+                StepType.EXTRACT, new ArrayList<>());
+        StepExecutor secondExecutor = createExecutor(
+                StepType.EXTRACT, new ArrayList<>());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutor(
+                        List.of(firstExecutor, secondExecutor))
+        );
+    }
+
+    @Test
+    void shouldRejectNullPipeline() {
+        PipelineExecutor executor = new PipelineExecutor(List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> executor.execute(null)
+        );
+    }
+
+    @Test
+    void shouldSucceedWhenPipelineHasNoSteps() {
+        PipelineExecutor executor = new PipelineExecutor(List.of());
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals("test-pipeline", result.pipelineId());
+    }
+
+    @Test
+    void shouldRejectNullExecutor() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutor(
+                        java.util.Arrays.asList((StepExecutor) null))
+        );
+    }
+
+    @Test
+    void shouldRejectExecutorWithNullSupportedType() {
+        StepExecutor executor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return null;
+            }
+
+            @Override
+            public void execute(PipelineStep step) {
+                // No operation required for this validation test.
+            }
+        };
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutor(List.of(executor))
+        );
     }
 
     private StepExecutor createExecutor(
