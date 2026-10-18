@@ -5,12 +5,12 @@ import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 /**
  * Executes the steps defined in a pipeline.
@@ -19,6 +19,7 @@ public class PipelineExecutor {
 
     private static final Logger LOGGER =
             Logger.getLogger(PipelineExecutor.class.getName());
+
     private final Map<StepType, StepExecutor> executors;
     private final PipelineExecutionListener listener;
 
@@ -86,14 +87,19 @@ public class PipelineExecutor {
                     "Pipeline must not be null");
         }
 
-        notifyStatus(pipeline.id(), PipelineStatus.RUNNING);
+        PipelineExecution execution =
+                new PipelineExecution(pipeline.id());
+
+        notifyStatus(pipeline.id(), execution.status());
 
         for (PipelineStep step : pipeline.steps()) {
             StepExecutor executor = executors.get(step.type());
 
             if (executor == null) {
-                return failedResult(
-                        pipeline.id(),
+                execution.fail();
+                notifyStatus(pipeline.id(), execution.status());
+
+                return execution.toResult(
                         step.id(),
                         "No executor registered for step type: "
                                 + step.type()
@@ -109,39 +115,18 @@ public class PipelineExecutor {
                     errorMessage = exception.getClass().getSimpleName();
                 }
 
-                return failedResult(
-                        pipeline.id(),
-                        step.id(),
-                        errorMessage
-                );
+                execution.fail();
+                notifyStatus(pipeline.id(), execution.status());
+
+                return execution.toResult(step.id(), errorMessage);
             }
         }
 
-        notifyStatus(pipeline.id(), PipelineStatus.SUCCEEDED);
+        execution.completeSuccessfully();
+        notifyStatus(pipeline.id(), execution.status());
 
-        return new PipelineExecutionResult(
-                pipeline.id(),
-                PipelineStatus.SUCCEEDED,
-                null,
-                null
-        );
+        return execution.toResult(null, null);
     }
-
-    private PipelineExecutionResult failedResult(
-            String pipelineId,
-            String failedStepId,
-            String errorMessage) {
-
-        notifyStatus(pipelineId, PipelineStatus.FAILED);
-
-        return new PipelineExecutionResult(
-                pipelineId,
-                PipelineStatus.FAILED,
-                failedStepId,
-                errorMessage
-        );
-    }
-
 
     /**
      * Notifies the listener without interrupting pipeline execution
@@ -169,4 +154,3 @@ public class PipelineExecutor {
         }
     }
 }
-

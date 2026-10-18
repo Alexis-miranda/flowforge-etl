@@ -285,6 +285,37 @@ class PipelineExecutorTest {
         assertEquals(PipelineStatus.SUCCEEDED, result.status());
     }
 
+    @Test
+    void shouldNotifyRunningBeforeSucceeded() {
+        List<PipelineStatus> receivedStatuses = new ArrayList<>();
+
+        PipelineExecutionListener listener =
+                (pipelineId, status) -> receivedStatuses.add(status);
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                listener
+        );
+
+        PipelineDefinition pipeline = new PipelineDefinition(
+                "pipeline-1",
+                "Test pipeline",
+                "Pipeline used for testing",
+                List.of()
+        );
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(
+                List.of(
+                        PipelineStatus.RUNNING,
+                        PipelineStatus.SUCCEEDED
+                ),
+                receivedStatuses
+        );
+    }
+
     private StepExecutor createExecutor(
             StepType type,
             List<String> executedSteps) {

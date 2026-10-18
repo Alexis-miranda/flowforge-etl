@@ -83,4 +83,30 @@ public class PipelineExecution {
     public Instant finishedAt() {
         return finishedAt;
     }
+
+
+    /**
+     * Creates a result describing the current execution outcome.
+     *
+     * @param failedStepId the identifier of the failed step, if any
+     * @param errorMessage the error message, if any
+     * @return the execution result
+     * @throws IllegalStateException if the execution has not finished
+     */
+    public PipelineExecutionResult toResult(
+            String failedStepId,
+            String errorMessage) {
+
+        if (status == PipelineStatus.RUNNING) {
+            throw new IllegalStateException(
+                    "Cannot create a result for an unfinished execution");
+        }
+
+        return new PipelineExecutionResult(
+                pipelineId,
+                status,
+                failedStepId,
+                errorMessage
+        );
+    }
 }
