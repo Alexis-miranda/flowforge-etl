@@ -220,5 +220,14 @@ class PipelineExecutionContextTest {
 
         assertFalse(view.containsKey("name"));
     }
+    @Test
+    void shouldRejectBlankKeyWhenRetrievingTypedValue() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.get("   ", String.class)
+        );
+    }
 
 }
