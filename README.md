@@ -2,12 +2,11 @@
 # FlowForge ETL
 
 <p align="center">
-  <!-- PROJECT COVER IMAGE -->
-<p align="center">
   <img src="docs/images/flowforge-cover.png"
        alt="FlowForge ETL"
        width="200" />
 </p>
+
 <p align="center">
   <strong>A modular ETL platform built with Java 21</strong>
   <br />
@@ -23,24 +22,24 @@
 
 ---
 
-##  About
+## About
 
 **FlowForge ETL** is a modular and extensible platform for building and executing data pipelines.
 
 The project provides a foundation for extracting, transforming, and loading data through configurable workflows, with a focus on clean architecture, testability, and maintainability.
 
-##  Features
+## Features
 
 - **CSV Extraction** — read structured data from CSV files.
--  **Data Transformation** — transform selected column values to uppercase.
--  **CSV Loading** — write processed records to CSV files.
--  **Pipeline Execution** — execute pipeline steps sequentially in the defined order.
--  **Shared Execution Context** — pass data between pipeline steps.
--  **Execution Tracking** — track execution status, duration, and failure details.
--  **Automated Testing** — verify components with unit and integration tests.
--  **Modular Architecture** — keep domain, execution, extraction, transformation, and loading responsibilities separate.
+- **Data Transformation** — transform selected column values to uppercase.
+- **CSV Loading** — write processed records to CSV files.
+- **Pipeline Execution** — execute pipeline steps sequentially in the defined order.
+- **Shared Execution Context** — pass data between pipeline steps.
+- **Execution Tracking** — track execution status, duration, and failure details.
+- **Automated Testing** — verify components with unit and integration tests.
+- **Modular Architecture** — keep domain, execution, extraction, transformation, and loading responsibilities separate.
 
-##  Architecture
+## Architecture
 
 FlowForge ETL currently consists of the `flowforge-core` Maven module.
 
@@ -55,9 +54,9 @@ FlowForge ETL currently consists of the `flowforge-core` Maven module.
 ### ETL Workflow
 
 <p align="center">
-  <!-- ETL WORKFLOW IMAGE -->
-  <!--  workflow image -->
-  <img src="https://images.openai.com/static-rsc-4/p4qlWVH6dyswPsvh6eQUQPkLalh5CPMheViSKJk0vkQi3bj8GSerhyoW4AMldRydSzvsE3eW3237gA4ss9N0osiVE7o_hVOJXWrY6MbtLY_5HasZ5iidGxyeidzmIdp22gLF89Qc6hurKxZqao9o9wy5C1LSAcQxG_uj6zsyrKz9iAVF4nX6dSN0XPY0zb_3?purpose=fullsize" alt="FlowForge ETL Workflow: CSV Extraction, Transformation, and Loading" width="100%" />
+  <img src="docs/images/flowforge-workflow.jpg"
+       alt="FlowForge ETL Workflow: CSV Extraction, Transformation, and Loading"
+       width="250" />
 </p>
 
 The current workflow demonstrates how data moves through the pipeline:
@@ -75,11 +74,15 @@ The current workflow demonstrates how data moves through the pipeline:
 | Apache Commons CSV | CSV parsing and writing |
 | JUnit Jupiter 5 | Automated testing |
 
-###  Planned Technologies
+### Planned Technologies
 
-- Spring Boot integration.
-- Microsoft SQL Server connectivity.
+- Spring Boot with embedded Apache Tomcat.
+- Microsoft SQL Server connectivity through JDBC.
+- RabbitMQ for asynchronous messaging.
+- Windows Server 2025 deployment as a Windows service.
 - Additional data sources, transformations, and loaders.
+
+*The technologies listed above are planned integrations and are not yet implemented.*
 
 ## Getting Started
 
@@ -98,11 +101,9 @@ mvn -version
 ### Clone the Repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/flowforge-etl.git
+git clone https://github.com/Alexis-miranda/flowforge-etl.git
 cd flowforge-etl
 ```
-
-Replace `YOUR_USERNAME` with your GitHub username.
 
 ### Validate the Project
 
@@ -118,24 +119,34 @@ mvn clean verify
 
 This command compiles the project and runs the automated test suite.
 
-##  Project Status
+## Project Status
 
- **Under active development**
+**Under active development**
 
 The current implementation supports CSV extraction, uppercase transformation, CSV loading, sequential pipeline execution, execution status tracking, and integration testing.
 
-##  Roadmap
+## Roadmap
 
 - [x] Core pipeline execution
 - [x] CSV extraction
 - [x] Uppercase transformation
 - [x] CSV loading
 - [x] Unit and integration tests
-- [ ] Additional transformation types
 - [ ] Microsoft SQL Server integration
-- [ ] Spring Boot integration
+- [ ] RabbitMQ messaging
+- [ ] Spring Boot web interface
+- [ ] Windows service deployment
+- [ ] Additional transformation types
 
-##  License
+## License
+
+No license has been selected yet.
+
+---
+
+<p align="center">
+  <sub>Built with Java ☕ and a focus on clean, modular ETL architecture.</sub>
+</p>
 
 No license has been selected yet.
 
