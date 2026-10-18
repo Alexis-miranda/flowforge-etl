@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core;
+package com.flowforge.etl.core.domain;
 
 import org.junit.jupiter.api.Test;
 

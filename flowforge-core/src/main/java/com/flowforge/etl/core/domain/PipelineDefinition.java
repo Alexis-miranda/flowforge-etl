@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core;
+package com.flowforge.etl.core.domain;
 
 import java.util.HashSet;
 import java.util.List;

@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core;
+package com.flowforge.etl.core.domain;
 
 /**
  * Represents the lifecycle status of an ETL pipeline execution.

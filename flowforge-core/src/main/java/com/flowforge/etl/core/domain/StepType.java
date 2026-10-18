@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core;
+package com.flowforge.etl.core.domain;
 
 /**
  * Defines the supported categories of ETL pipeline steps.
