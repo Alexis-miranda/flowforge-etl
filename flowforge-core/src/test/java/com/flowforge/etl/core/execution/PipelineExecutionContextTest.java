@@ -230,4 +230,16 @@ class PipelineExecutionContextTest {
         );
     }
 
+    @Test
+    void shouldReturnRemovedValueAndRemoveKey() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("count", 42);
+
+        Object removedValue = context.remove("count");
+
+        assertEquals(42, removedValue);
+        assertFalse(context.contains("count"));
+        assertNull(context.get("count"));
+    }
+
 }
