@@ -115,6 +115,34 @@ class PipelineExecutorTest {
     }
 
     @Test
+    void shouldUseExceptionTypeWhenFailureHasNoMessage() {
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(PipelineStep step) {
+                throw new IllegalStateException();
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor)
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals("extract", result.failedStepId());
+        assertEquals("IllegalStateException", result.errorMessage());
+    }
+    @Test
     void shouldRejectDuplicateExecutorTypes() {
         StepExecutor firstExecutor = createExecutor(
                 StepType.EXTRACT, new ArrayList<>());
