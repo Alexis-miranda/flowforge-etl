@@ -138,20 +138,13 @@ The current implementation supports CSV extraction, uppercase transformation, CS
 - [ ] Windows service deployment
 - [ ] Additional transformation types
 
+---
 ## License
 
 No license has been selected yet.
 
 ---
 
-<p align="center">
-  <sub>Built with Java ☕ and a focus on clean, modular ETL architecture.</sub>
-</p>
-
-No license has been selected yet.
-
----
-
-<p align="center">
+<p align="center" >
   <sub>Built with Java ☕ and a focus on clean, modular ETL architecture.</sub>
 </p>
