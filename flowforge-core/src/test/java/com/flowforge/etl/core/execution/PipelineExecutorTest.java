@@ -419,6 +419,46 @@ class PipelineExecutorTest {
         assertEquals(PipelineStatus.SUCCEEDED, result.status());
     }
 
+    @Test
+    void shouldCreateNewContextForEachExecution() {
+        List<PipelineExecutionContext> receivedContexts = new ArrayList<>();
+
+        StepExecutor extractExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                receivedContexts.add(context);
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(extractExecutor)
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)
+        ));
+
+        PipelineExecutionResult firstResult = executor.execute(pipeline);
+        PipelineExecutionResult secondResult = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, firstResult.status());
+        assertEquals(PipelineStatus.SUCCEEDED, secondResult.status());
+        assertEquals(2, receivedContexts.size());
+
+        assertNotSame(receivedContexts.get(0), receivedContexts.get(1));
+
+    }
+
+
+
+
     private StepExecutor createExecutor(
             StepType type,
             List<String> executedSteps) {
