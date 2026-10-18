@@ -43,6 +43,37 @@ public class PipelineExecutionContext {
     }
 
     /**
+     * Retrieves a value from the execution context and checks its type.
+     *
+     * @param key the data key
+     * @param type the expected value type
+     * @param <T> the expected value type
+     * @return the stored value cast to the expected type, or null if absent
+     * @throws IllegalArgumentException if the key or type is invalid
+     * @throws ClassCastException if the stored value has an incompatible type
+     */
+    public <T> T get(String key, Class<T> type) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Context key must not be blank");
+        }
+
+        if (type == null) {
+            throw new IllegalArgumentException(
+                    "Expected type must not be null");
+        }
+
+        Object value = data.get(key);
+
+        if (value == null) {
+            return null;
+        }
+
+        return type.cast(value);
+    }
+
+
+    /**
      * Returns an unmodifiable view of the stored data.
      *
      * @return an unmodifiable map of the context data

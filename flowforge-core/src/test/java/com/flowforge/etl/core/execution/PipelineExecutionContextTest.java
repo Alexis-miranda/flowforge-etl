@@ -60,4 +60,43 @@ class PipelineExecutionContextTest {
                 () -> context.asMap().put("status", "failed")
         );
     }
+    @Test
+    void shouldRetrieveValueUsingExpectedType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("name", "FlowForge");
+
+        String name = context.get("name", String.class);
+
+        assertEquals("FlowForge", name);
+    }
+
+    @Test
+    void shouldReturnNullWhenTypedValueDoesNotExist() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        String value = context.get("missing", String.class);
+
+        assertNull(value);
+    }
+
+    @Test
+    void shouldRejectValueWithIncompatibleType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("count", 42);
+
+        assertThrows(
+                ClassCastException.class,
+                () -> context.get("count", String.class)
+        );
+    }
+
+    @Test
+    void shouldRejectNullExpectedType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.get("name", null)
+        );
+    }
 }

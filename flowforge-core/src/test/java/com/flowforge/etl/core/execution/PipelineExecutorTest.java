@@ -398,9 +398,12 @@ class PipelineExecutorTest {
             public void execute(
                     PipelineStep step,
                     PipelineExecutionContext context) {
+
+                List<?> records = context.get("records", List.class);
+
                 assertEquals(
                         List.of("record-1", "record-2"),
-                        context.get("records")
+                        records
                 );
             }
         };
