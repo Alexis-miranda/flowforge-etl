@@ -13,15 +13,22 @@ public class PipelineExecutionContext {
     private final Map<String, Object> data = new HashMap<>();
 
     /**
-     * Stores a value in the execution context.
+     * Stores a non-null value in the execution context.
      *
      * @param key the data key
      * @param value the value to store
+     * @throws IllegalArgumentException if the key is null or blank,
+     *                                  or the value is null
      */
     public void put(String key, Object value) {
         if (key == null || key.isBlank()) {
             throw new IllegalArgumentException(
                     "Context key must not be blank");
+        }
+
+        if (value == null) {
+            throw new IllegalArgumentException(
+                    "Context value must not be null");
         }
 
         data.put(key, value);

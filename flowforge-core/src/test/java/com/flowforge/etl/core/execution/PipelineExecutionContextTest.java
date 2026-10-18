@@ -184,4 +184,26 @@ class PipelineExecutionContextTest {
         assertFalse(context.contains("name"));
         assertEquals("ready", context.get("status"));
     }
+/**
+    @Test
+    void shouldDistinguishExistingKeyWithNullValueFromMissingKey() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("optional", null);
+
+        assertTrue(context.contains("optional"));
+        assertNull(context.get("optional"));
+        assertFalse(context.contains("missing"));
+    }**/
+
+
+    @Test
+    void shouldRejectNullValue() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.put("optional", null)
+        );
+    }
+
 }
