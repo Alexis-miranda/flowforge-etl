@@ -121,4 +121,43 @@ class PipelineExecutionContextTest {
                 () -> context.contains(null)
         );
     }
+    @Test
+    void shouldRemoveExistingKey() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("name", "FlowForge");
+
+        Object removedValue = context.remove("name");
+
+        assertEquals("FlowForge", removedValue);
+        assertFalse(context.contains("name"));
+    }
+
+    @Test
+    void shouldReturnNullWhenRemovingMissingKey() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        Object removedValue = context.remove("missing");
+
+        assertNull(removedValue);
+    }
+
+    @Test
+    void shouldRejectNullKeyWhenRemoving() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.remove(null)
+        );
+    }
+
+    @Test
+    void shouldRejectBlankKeyWhenRemoving() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.remove("   ")
+        );
+    }
 }

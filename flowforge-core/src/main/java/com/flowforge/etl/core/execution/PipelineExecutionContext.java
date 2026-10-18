@@ -86,6 +86,21 @@ public class PipelineExecutionContext {
 
         return data.containsKey(key);
     }
+    /**
+     * Removes a value from the execution context.
+     *
+     * @param key the data key
+     * @return the removed value, or null if the key did not exist
+     * @throws IllegalArgumentException if the key is null or blank
+     */
+    public Object remove(String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Context key must not be blank");
+        }
+
+        return data.remove(key);
+    }
 
     /**
      * Returns an unmodifiable view of the stored data.
