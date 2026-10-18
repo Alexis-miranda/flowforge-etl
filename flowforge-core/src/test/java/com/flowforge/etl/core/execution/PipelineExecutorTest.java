@@ -1,6 +1,5 @@
 package com.flowforge.etl.core.execution;
 
-
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
@@ -33,9 +32,12 @@ class PipelineExecutorTest {
                 createStep("extract", StepType.EXTRACT, 1)
         ));
 
-        PipelineStatus status = executor.execute(pipeline);
+        PipelineExecutionResult result = executor.execute(pipeline);
 
-        assertEquals(PipelineStatus.SUCCEEDED, status);
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals("test-pipeline", result.pipelineId());
+        assertEquals(null, result.failedStepId());
+        assertEquals(null, result.errorMessage());
         assertEquals(List.of("extract", "transform"), executedSteps);
     }
 
@@ -51,10 +53,10 @@ class PipelineExecutorTest {
                 createStep("extract", StepType.EXTRACT, 1)
         ));
 
-        assertEquals(
-                PipelineStatus.SUCCEEDED,
-                executor.execute(pipeline)
-        );
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals("test-pipeline", result.pipelineId());
     }
 
     @Test
@@ -65,9 +67,13 @@ class PipelineExecutorTest {
                 createStep("extract", StepType.EXTRACT, 1)
         ));
 
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals("extract", result.failedStepId());
         assertEquals(
-                PipelineStatus.FAILED,
-                executor.execute(pipeline)
+                "No executor registered for step type: EXTRACT",
+                result.errorMessage()
         );
     }
 
@@ -99,9 +105,11 @@ class PipelineExecutorTest {
                 createStep("transform", StepType.TRANSFORM, 2)
         ));
 
-        PipelineStatus status = executor.execute(pipeline);
+        PipelineExecutionResult result = executor.execute(pipeline);
 
-        assertEquals(PipelineStatus.FAILED, status);
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals("extract", result.failedStepId());
+        assertEquals("Extraction failed", result.errorMessage());
         assertEquals(List.of("extract"), executedSteps);
     }
 

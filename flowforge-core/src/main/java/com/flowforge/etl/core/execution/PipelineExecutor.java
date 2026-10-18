@@ -40,28 +40,50 @@ public class PipelineExecutor {
      * Executes all steps in the pipeline in their defined order.
      *
      * @param pipeline the pipeline definition
-     * @return the final pipeline status
+     * @return the detailed execution result
      */
-    public PipelineStatus execute(PipelineDefinition pipeline) {
+    public PipelineExecutionResult execute(PipelineDefinition pipeline) {
         if (pipeline == null) {
             throw new IllegalArgumentException(
                     "Pipeline must not be null");
         }
 
-        try {
-            for (PipelineStep step : pipeline.steps()) {
-                StepExecutor executor = executors.get(step.type());
+        for (PipelineStep step : pipeline.steps()) {
+            StepExecutor executor = executors.get(step.type());
 
-                if (executor == null) {
-                    return PipelineStatus.FAILED;
-                }
-
-                executor.execute(step);
+            if (executor == null) {
+                return new PipelineExecutionResult(
+                        pipeline.id(),
+                        PipelineStatus.FAILED,
+                        step.id(),
+                        "No executor registered for step type: "
+                                + step.type()
+                );
             }
 
-            return PipelineStatus.SUCCEEDED;
-        } catch (RuntimeException exception) {
-            return PipelineStatus.FAILED;
+            try {
+                executor.execute(step);
+            } catch (RuntimeException exception) {
+                String errorMessage = exception.getMessage();
+
+                if (errorMessage == null || errorMessage.isBlank()) {
+                    errorMessage = exception.getClass().getSimpleName();
+                }
+
+                return new PipelineExecutionResult(
+                        pipeline.id(),
+                        PipelineStatus.FAILED,
+                        step.id(),
+                        errorMessage
+                );
+            }
         }
+
+        return new PipelineExecutionResult(
+                pipeline.id(),
+                PipelineStatus.SUCCEEDED,
+                null,
+                null
+        );
     }
 }
