@@ -103,10 +103,13 @@ public class PipelineExecution {
         }
 
         return new PipelineExecutionResult(
+                executionId,
                 pipelineId,
                 status,
                 failedStepId,
-                errorMessage
+                errorMessage,
+                startedAt,
+                finishedAt
         );
     }
 }
