@@ -3,8 +3,7 @@ package com.flowforge.etl.core;
 
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for {@link PipelineStep}.
@@ -61,4 +60,55 @@ class PipelineStepTest {
                         "Extract Customers", StepType.EXTRACT, 0)
         );
     }
+
+    @Test
+    void shouldCreateStepWithEmptyConfigurationByDefault() {
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract Customers",
+                StepType.EXTRACT,
+                1
+        );
+
+        assertTrue(step.configuration().properties().isEmpty());
+    }
+
+    @Test
+    void shouldCreateStepWithCustomConfiguration() {
+        StepConfiguration configuration = new StepConfiguration(
+                java.util.Map.of(
+                        "query", "SELECT * FROM customers",
+                        "fetchSize", "500"
+                )
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract Customers",
+                StepType.EXTRACT,
+                1,
+                configuration
+        );
+
+        assertEquals(
+                "SELECT * FROM customers",
+                step.configuration().get("query")
+        );
+        assertEquals("500", step.configuration().get("fetchSize"));
+    }
+
+    @Test
+    void shouldRejectNullConfiguration() {
+        assertThrows(
+                NullPointerException.class,
+                () -> new PipelineStep(
+                        "extract-customers",
+                        "Extract Customers",
+                        StepType.EXTRACT,
+                        1,
+                        null
+                )
+        );
+    }
+
 }

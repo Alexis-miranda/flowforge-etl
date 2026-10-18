@@ -10,13 +10,27 @@ import java.util.Objects;
  * @param name human-readable name of the step
  * @param type category of the ETL operation
  * @param order execution position, starting at one
+ * @param configuration parameters required by the step
  */
 public record PipelineStep(
         String id,
         String name,
         StepType type,
-        int order
+        int order,
+        StepConfiguration configuration
 ) {
+
+    /**
+     * Creates a pipeline step with an empty configuration.
+     *
+     * @param id unique identifier of the step
+     * @param name human-readable name of the step
+     * @param type category of the ETL operation
+     * @param order execution position, starting at one
+     */
+    public PipelineStep(String id, String name, StepType type, int order) {
+        this(id, name, type, order, new StepConfiguration(java.util.Map.of()));
+    }
 
     /**
      * Validates the mandatory properties of a pipeline step.
@@ -31,6 +45,10 @@ public record PipelineStep(
         }
 
         Objects.requireNonNull(type, "Step type must not be null");
+        Objects.requireNonNull(
+                configuration,
+                "Step configuration must not be null"
+        );
 
         if (order < 1) {
             throw new IllegalArgumentException(
