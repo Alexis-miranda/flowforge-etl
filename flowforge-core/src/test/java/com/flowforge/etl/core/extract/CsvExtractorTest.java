@@ -429,4 +429,66 @@ class CsvExtractorTest {
             recordsVerified = true;
         }
     }
+
+    @Test
+    void shouldRejectCsvRecordWithMissingField() throws Exception {
+        Path csvFile = tempDir.resolve("customers-missing-field.csv");
+
+        Files.writeString(
+                csvFile,
+                "name,city\nAna,Geneva\nLuis\n"
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", csvFile.toString(),
+                        "outputKey", "customers"
+                ))
+        );
+
+        PipelineExecutionContext context =
+                new PipelineExecutionContext();
+
+        CsvExtractor extractor = new CsvExtractor();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> extractor.execute(step, context)
+        );
+    }
+
+    @Test
+    void shouldRejectCsvRecordWithExtraField() throws Exception {
+        Path csvFile = tempDir.resolve("customers-extra-field.csv");
+
+        Files.writeString(
+                csvFile,
+                "name,city\nAna,Geneva,EXTRA\n"
+        );
+
+        PipelineStep step = new PipelineStep(
+                "extract-customers",
+                "Extract customers",
+                StepType.EXTRACT,
+                1,
+                new StepConfiguration(Map.of(
+                        "path", csvFile.toString(),
+                        "outputKey", "customers"
+                ))
+        );
+
+        PipelineExecutionContext context =
+                new PipelineExecutionContext();
+
+        CsvExtractor extractor = new CsvExtractor();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> extractor.execute(step, context)
+        );
+    }
 }

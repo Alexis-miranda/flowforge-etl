@@ -1,11 +1,11 @@
 
-
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
+import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.util.HashMap;
 import java.util.List;
@@ -23,14 +23,15 @@ public class PipelineExecutor {
 
     private final Map<StepType, StepExecutor> executors;
     private final PipelineExecutionListener listener;
+    private final PipelineExecutionRepository repository;
 
     /**
-     * Creates a pipeline executor without a status listener.
+     * Creates a pipeline executor without a status listener or repository.
      *
      * @param stepExecutors the available step executors
      */
     public PipelineExecutor(List<StepExecutor> stepExecutors) {
-        this(stepExecutors, null);
+        this(stepExecutors, null, null);
     }
 
     /**
@@ -42,6 +43,20 @@ public class PipelineExecutor {
     public PipelineExecutor(
             List<StepExecutor> stepExecutors,
             PipelineExecutionListener listener) {
+        this(stepExecutors, listener, null);
+    }
+
+    /**
+     * Creates a pipeline executor with a status listener and repository.
+     *
+     * @param stepExecutors the available step executors
+     * @param listener the listener for execution status changes
+     * @param repository the repository for completed execution results
+     */
+    public PipelineExecutor(
+            List<StepExecutor> stepExecutors,
+            PipelineExecutionListener listener,
+            PipelineExecutionRepository repository) {
 
         if (stepExecutors == null) {
             throw new IllegalArgumentException(
@@ -73,6 +88,7 @@ public class PipelineExecutor {
 
         this.executors = Map.copyOf(executorMap);
         this.listener = listener;
+        this.repository = repository;
     }
 
     /**
@@ -103,10 +119,12 @@ public class PipelineExecutor {
                 execution.fail();
                 notifyStatus(pipeline.id(), execution.status());
 
-                return execution.toResult(
-                        step.id(),
-                        "No executor registered for step type: "
-                                + step.type()
+                return saveResult(
+                        execution.toResult(
+                                step.id(),
+                                "No executor registered for step type: "
+                                        + step.type()
+                        )
                 );
             }
 
@@ -122,14 +140,32 @@ public class PipelineExecutor {
                 execution.fail();
                 notifyStatus(pipeline.id(), execution.status());
 
-                return execution.toResult(step.id(), errorMessage);
+                return saveResult(
+                        execution.toResult(step.id(), errorMessage)
+                );
             }
         }
 
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
 
-        return execution.toResult(null, null);
+        return saveResult(execution.toResult(null, null));
+    }
+
+    /**
+     * Saves a completed execution result when a repository is configured.
+     *
+     * @param result the completed execution result
+     * @return the same execution result
+     */
+    private PipelineExecutionResult saveResult(
+            PipelineExecutionResult result) {
+
+        if (repository != null) {
+            repository.save(result);
+        }
+
+        return result;
     }
 
     /**

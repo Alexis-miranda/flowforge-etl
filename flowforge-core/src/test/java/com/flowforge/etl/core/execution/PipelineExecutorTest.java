@@ -6,6 +6,7 @@ import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;
 import com.flowforge.etl.core.domain.StepType;
 import org.junit.jupiter.api.Test;
+import com.flowforge.etl.core.repository.InMemoryPipelineExecutionRepository;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -468,6 +469,108 @@ class PipelineExecutorTest {
         );
     }
 
+    @Test
+    void shouldSaveSuccessfulExecutionResultToRepository() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                repository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        PipelineExecutionResult savedResult = repository
+                .findByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(result.executionId(), savedResult.executionId());
+        assertEquals(result.pipelineId(), savedResult.pipelineId());
+        assertEquals(PipelineStatus.SUCCEEDED, savedResult.status());
+    }
+
+
+    @Test
+    void shouldSaveFailedExecutionResultToRepository() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                throw new IllegalStateException("Extraction failed");
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor),
+                null,
+                repository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        PipelineExecutionResult savedResult = repository
+                .findByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(PipelineStatus.FAILED, savedResult.status());
+        assertEquals("extract", savedResult.failedStepId());
+        assertEquals("Extraction failed", savedResult.errorMessage());
+        assertEquals(result.executionId(), savedResult.executionId());
+    }
+
+
+    @Test
+    void shouldSaveEachExecutionSeparately() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                repository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        PipelineExecutionResult firstResult = executor.execute(pipeline);
+        PipelineExecutionResult secondResult = executor.execute(pipeline);
+
+        assertNotEquals(
+                firstResult.executionId(),
+                secondResult.executionId()
+        );
+
+        List<PipelineExecutionResult> savedResults =
+                repository.findByPipelineId(pipeline.id());
+
+        assertEquals(2, savedResults.size());
+        assertEquals(
+                firstResult.executionId(),
+                savedResults.get(0).executionId()
+        );
+        assertEquals(
+                secondResult.executionId(),
+                savedResults.get(1).executionId()
+        );
+    }
 
 
     private StepExecutor createExecutor(

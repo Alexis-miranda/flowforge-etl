@@ -172,6 +172,15 @@ public class CsvExtractor implements StepExecutor {
             validateRequiredHeaders(headers, requiredHeaders);
 
             for (CSVRecord record : parser) {
+                if (record.size() != headers.size()) {
+                    throw new IllegalArgumentException(
+                            "Invalid number of fields in CSV record at line "
+                                    + record.getRecordNumber()
+                                    + ": expected " + headers.size()
+                                    + " but found " + record.size()
+                    );
+                }
+
                 Map<String, String> row = new LinkedHashMap<>();
 
                 for (String header : headers) {
