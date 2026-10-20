@@ -39,11 +39,11 @@ public class CashPipelineIntegrationTest {
 
         Files.writeString(
                 inputFile,
-                "accountCode,currency,amount\n"
-                        + "ACC001,EUR,150.50\n"
-                        + "ACC002,USD,200.00\n"
-                        + "ACC003,XYZ,75.00\n"
-                        + ",GBP,50.00\n",
+                "accountCode,adjustmentId,currency,amount\n"
+                        + "ACC001,ADJ001,EUR,150.50\n"
+                        + "ACC002,ADJ002,USD,200.00\n"
+                        + "ACC003,ADJ003,XYZ,75.00\n"
+                        + ",ADJ004,GBP,50.00\n",
                 StandardCharsets.UTF_8
         );
 

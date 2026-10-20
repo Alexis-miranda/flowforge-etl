@@ -88,11 +88,15 @@ public class CashValidator implements StepExecutor {
             Set<String> currencies
     ) {
         String account = record.get("accountCode");
+        String adjustmentId = record.get("adjustmentId");
         String currency = record.get("currency");
         String amount = record.get("amount");
 
         if (account == null || account.isBlank()) {
             return "Missing accountCode";
+        }
+        if (adjustmentId == null || adjustmentId.isBlank()) {
+            return "Missing adjustmentId";
         }
 
         if (currency == null || currency.isBlank()) {
