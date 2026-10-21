@@ -17,6 +17,18 @@ public interface StepExecutor {
     StepType supportedType();
 
     /**
+     * Returns the connector key supported by this executor.
+     *
+     * Existing executors use the default key until they declare
+     * a specific connector.
+     *
+     * @return the connector key
+     */
+    default String connectorKey() {
+        return "default";
+    }
+
+    /**
      * Executes the given pipeline step using the shared execution context.
      *
      * @param step the pipeline step to execute

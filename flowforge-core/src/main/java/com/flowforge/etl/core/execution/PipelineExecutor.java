@@ -21,38 +21,22 @@ public class PipelineExecutor {
     private static final Logger LOGGER =
             Logger.getLogger(PipelineExecutor.class.getName());
 
-    private final Map<StepType, StepExecutor> executors;
+    private static final String CONNECTOR_PROPERTY = "connector";
+
+    private final Map<StepType, Map<String, StepExecutor>> executors;
     private final PipelineExecutionListener listener;
     private final PipelineExecutionRepository repository;
 
-    /**
-     * Creates a pipeline executor without a status listener or repository.
-     *
-     * @param stepExecutors the available step executors
-     */
     public PipelineExecutor(List<StepExecutor> stepExecutors) {
         this(stepExecutors, null, null);
     }
 
-    /**
-     * Creates a pipeline executor with a status listener.
-     *
-     * @param stepExecutors the available step executors
-     * @param listener the listener for execution status changes
-     */
     public PipelineExecutor(
             List<StepExecutor> stepExecutors,
             PipelineExecutionListener listener) {
         this(stepExecutors, listener, null);
     }
 
-    /**
-     * Creates a pipeline executor with a status listener and repository.
-     *
-     * @param stepExecutors the available step executors
-     * @param listener the listener for execution status changes
-     * @param repository the repository for completed execution results
-     */
     public PipelineExecutor(
             List<StepExecutor> stepExecutors,
             PipelineExecutionListener listener,
@@ -63,7 +47,8 @@ public class PipelineExecutor {
                     "Step executors must not be null");
         }
 
-        Map<StepType, StepExecutor> executorMap = new HashMap<>();
+        Map<StepType, Map<String, StepExecutor>> executorMap =
+                new HashMap<>();
 
         for (StepExecutor executor : stepExecutors) {
             if (executor == null) {
@@ -78,15 +63,36 @@ public class PipelineExecutor {
                         "Executor supported type must not be null");
             }
 
-            if (executorMap.containsKey(type)) {
+            String connectorKey = executor.connectorKey();
+
+            if (connectorKey == null || connectorKey.isBlank()) {
                 throw new IllegalArgumentException(
-                        "Duplicate executor for step type: " + type);
+                        "Executor connector key must not be blank");
             }
 
-            executorMap.put(type, executor);
+            Map<String, StepExecutor> connectors =
+                    executorMap.computeIfAbsent(
+                            type, ignored -> new HashMap<>());
+
+            if (connectors.containsKey(connectorKey)) {
+                throw new IllegalArgumentException(
+                        "Duplicate executor for step type "
+                                + type
+                                + " and connector: "
+                                + connectorKey);
+            }
+
+            connectors.put(connectorKey, executor);
         }
 
-        this.executors = Map.copyOf(executorMap);
+        Map<StepType, Map<String, StepExecutor>> immutableMap =
+                new HashMap<>();
+
+        executorMap.forEach(
+                (type, connectors) ->
+                        immutableMap.put(type, Map.copyOf(connectors)));
+
+        this.executors = Map.copyOf(immutableMap);
         this.listener = listener;
         this.repository = repository;
     }
@@ -113,19 +119,48 @@ public class PipelineExecutor {
         notifyStatus(pipeline.id(), execution.status());
 
         for (PipelineStep step : pipeline.steps()) {
-            StepExecutor executor = executors.get(step.type());
+            Map<String, StepExecutor> connectors =
+                    executors.get(step.type());
 
-            if (executor == null) {
-                execution.fail();
-                notifyStatus(pipeline.id(), execution.status());
+            if (connectors == null || connectors.isEmpty()) {
+                return failExecution(
+                        execution,
+                        pipeline.id(),
+                        step,
+                        "No executor registered for step type: "
+                                + step.type());
+            }
 
-                return saveResult(
-                        execution.toResult(
-                                step.id(),
-                                "No executor registered for step type: "
-                                        + step.type()
-                        )
-                );
+            String connectorKey =
+                    step.configuration().get(CONNECTOR_PROPERTY);
+
+            StepExecutor executor;
+
+            if (connectorKey != null && !connectorKey.isBlank()) {
+                executor = connectors.get(connectorKey);
+
+                if (executor == null) {
+                    return failExecution(
+                            execution,
+                            pipeline.id(),
+                            step,
+                            "No executor registered for step type "
+                                    + step.type()
+                                    + " and connector: "
+                                    + connectorKey);
+                }
+            } else if (connectors.size() == 1) {
+                executor = connectors.values().iterator().next();
+            } else {
+                return failExecution(
+                        execution,
+                        pipeline.id(),
+                        step,
+                        "Multiple executors are registered for step type "
+                                + step.type()
+                                + ". Specify the '"
+                                + CONNECTOR_PROPERTY
+                                + "' property.");
             }
 
             try {
@@ -137,12 +172,11 @@ public class PipelineExecutor {
                     errorMessage = exception.getClass().getSimpleName();
                 }
 
-                execution.fail();
-                notifyStatus(pipeline.id(), execution.status());
-
-                return saveResult(
-                        execution.toResult(step.id(), errorMessage)
-                );
+                return failExecution(
+                        execution,
+                        pipeline.id(),
+                        step,
+                        errorMessage);
             }
         }
 
@@ -152,11 +186,21 @@ public class PipelineExecutor {
         return saveResult(execution.toResult(null, null));
     }
 
+    private PipelineExecutionResult failExecution(
+            PipelineExecution execution,
+            String pipelineId,
+            PipelineStep step,
+            String errorMessage) {
+
+        execution.fail();
+        notifyStatus(pipelineId, execution.status());
+
+        return saveResult(
+                execution.toResult(step.id(), errorMessage));
+    }
+
     /**
      * Saves a completed execution result when a repository is configured.
-     *
-     * @param result the completed execution result
-     * @return the same execution result
      */
     private PipelineExecutionResult saveResult(
             PipelineExecutionResult result) {
@@ -169,13 +213,12 @@ public class PipelineExecutor {
     }
 
     /**
-     * Notifies the listener without interrupting pipeline execution
-     * if the listener fails.
-     *
-     * @param pipelineId the identifier of the pipeline
-     * @param status the new execution status
+     * Notifies the listener without interrupting execution if it fails.
      */
-    private void notifyStatus(String pipelineId, PipelineStatus status) {
+    private void notifyStatus(
+            String pipelineId,
+            PipelineStatus status) {
+
         if (listener == null) {
             return;
         }
@@ -189,8 +232,7 @@ public class PipelineExecutor {
                             + pipelineId
                             + " while notifying status "
                             + status,
-                    exception
-            );
+                    exception);
         }
     }
 }

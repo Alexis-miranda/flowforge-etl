@@ -27,6 +27,10 @@ public class CashValidator implements StepExecutor {
     }
 
     @Override
+    public String connectorKey() {
+        return "cash-validator";
+    }
+    @Override
     public void execute(
             PipelineStep step,
             PipelineExecutionContext context

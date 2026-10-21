@@ -148,11 +148,12 @@ class PipelineExecutorTest {
     }
 
     @Test
-    void shouldRejectDuplicateExecutorTypes() {
-        StepExecutor firstExecutor = createExecutor(
-                StepType.EXTRACT, new ArrayList<>());
-        StepExecutor secondExecutor = createExecutor(
-                StepType.EXTRACT, new ArrayList<>());
+    void shouldRejectDuplicateExecutorTypesAndConnectorKeys() {
+        StepExecutor firstExecutor =
+                createExecutor(StepType.EXTRACT, new ArrayList<>());
+
+        StepExecutor secondExecutor =
+                createExecutor(StepType.EXTRACT, new ArrayList<>());
 
         assertThrows(
                 IllegalArgumentException.class,
@@ -160,6 +161,116 @@ class PipelineExecutorTest {
                         List.of(firstExecutor, secondExecutor))
         );
     }
+
+
+    @Test
+    void shouldAllowMultipleExecutorsForSameTypeWithDifferentConnectors() {
+        List<String> executedSteps = new ArrayList<>();
+
+        StepExecutor csvExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.LOAD;
+            }
+
+            @Override
+            public String connectorKey() {
+                return "csv";
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                executedSteps.add("csv");
+            }
+        };
+
+        StepExecutor sqlServerExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.LOAD;
+            }
+
+            @Override
+            public String connectorKey() {
+                return "sqlserver";
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                executedSteps.add("sqlserver");
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(csvExecutor, sqlServerExecutor));
+
+        PipelineStep csvStep = new PipelineStep(
+                "load-csv",
+                "Load CSV",
+                StepType.LOAD,
+                1,
+                new StepConfiguration(Map.of("connector", "csv"))
+        );
+
+        PipelineExecutionResult result = executor.execute(
+                createPipeline(List.of(csvStep)));
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(List.of("csv"), executedSteps);
+    }
+
+    @Test
+    void shouldFailWhenMultipleConnectorsExistAndConnectorIsMissing() {
+        StepExecutor csvExecutor = createExecutorWithConnector(
+                StepType.LOAD, "csv", new ArrayList<>());
+
+        StepExecutor sqlServerExecutor = createExecutorWithConnector(
+                StepType.LOAD, "sqlserver", new ArrayList<>());
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(csvExecutor, sqlServerExecutor));
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("load", StepType.LOAD, 1)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals("load", result.failedStepId());
+        assertTrue(result.errorMessage().contains(
+                "Specify the 'connector' property"));
+    }
+
+    @Test
+    void shouldFailWhenConnectorIsNotRegistered() {
+        StepExecutor csvExecutor = createExecutorWithConnector(
+                StepType.LOAD, "csv", new ArrayList<>());
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(csvExecutor));
+
+        PipelineStep step = new PipelineStep(
+                "load",
+                "Load data",
+                StepType.LOAD,
+                1,
+                new StepConfiguration(Map.of("connector", "unknown"))
+        );
+
+        PipelineExecutionResult result = executor.execute(
+                createPipeline(List.of(step)));
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals("load", result.failedStepId());
+        assertTrue(result.errorMessage().contains(
+                "connector: unknown"));
+    }
+
 
     @Test
     void shouldRejectNullPipeline() {
@@ -570,6 +681,32 @@ class PipelineExecutorTest {
                 secondResult.executionId(),
                 savedResults.get(1).executionId()
         );
+    }
+
+
+    private StepExecutor createExecutorWithConnector(
+            StepType type,
+            String connector,
+            List<String> executedSteps) {
+
+        return new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return type;
+            }
+
+            @Override
+            public String connectorKey() {
+                return connector;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                executedSteps.add(step.id());
+            }
+        };
     }
 
 

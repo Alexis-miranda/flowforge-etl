@@ -35,6 +35,18 @@ public class CsvLoader implements StepExecutor {
         return StepType.LOAD;
     }
 
+
+    /**
+     * Returns the connector key supported by this executor.
+     *
+     * @return the CSV connector key
+     */
+    @Override
+    public String connectorKey() {
+        return "csv";
+    }
+
+
     /**
      * Writes records from the execution context to a CSV file.
      *

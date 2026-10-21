@@ -21,6 +21,10 @@ public class UppercaseTransformer implements StepExecutor {
         return StepType.TRANSFORM;
     }
 
+    @Override
+    public String connectorKey() {
+        return "uppercase";
+    }
     /**
      * Executes the uppercase transformation.
      *
