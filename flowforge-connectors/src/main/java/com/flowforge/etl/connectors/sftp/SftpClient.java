@@ -4,6 +4,11 @@ package com.flowforge.etl.connectors.sftp;
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.sftp.client.SftpClientFactory;
+import java.nio.file.Path;
+import org.apache.sshd.client.keyverifier.KnownHostsServerKeyVerifier;
+import org.apache.sshd.client.keyverifier.DefaultKnownHostsServerKeyVerifier;
+import org.apache.sshd.client.keyverifier.KnownHostsServerKeyVerifier;
+import org.apache.sshd.client.keyverifier.RejectAllServerKeyVerifier;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -39,9 +44,19 @@ public final class SftpClient
             String username,
             String password) throws IOException {
 
-        SshClient sshClient = SshClient.setUpDefaultClient();
-        ClientSession session = null;
+        Path knownHostsPath = Path.of(
+                System.getProperty("user.home"),
+                ".ssh",
+                "known_hosts");
 
+        SshClient sshClient = SshClient.setUpDefaultClient();
+
+        sshClient.setServerKeyVerifier(
+                new KnownHostsServerKeyVerifier(
+                        RejectAllServerKeyVerifier.INSTANCE,
+                        knownHostsPath));
+
+        ClientSession session = null;
         try {
             sshClient.start();
 
