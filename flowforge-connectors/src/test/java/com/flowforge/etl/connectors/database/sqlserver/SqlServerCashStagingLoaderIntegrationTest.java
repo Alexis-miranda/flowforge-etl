@@ -1,11 +1,11 @@
 
-package com.flowforge.etl.core.integration;
+package com.flowforge.etl.connectors.database.sqlserver;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
-import com.flowforge.etl.core.load.SqlServerCashStagingLoader;
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerCashStagingLoader;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 

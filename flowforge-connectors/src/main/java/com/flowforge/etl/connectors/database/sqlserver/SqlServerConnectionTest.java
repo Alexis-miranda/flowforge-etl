@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core.infrastructure.database;
+package com.flowforge.etl.connectors.database.sqlserver;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -40,4 +40,3 @@ public class SqlServerConnectionTest {
         }
     }
 }
-

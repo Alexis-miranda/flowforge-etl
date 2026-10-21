@@ -1,12 +1,12 @@
 
-package com.flowforge.etl.core.integration;
+package com.flowforge.etl.connectors.integration;
 
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerCashStagingLoader;
+import com.flowforge.etl.connectors.file.csv.CsvExtractor;
+import com.flowforge.etl.connectors.file.csv.CsvLoader;
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import com.flowforge.etl.core.execution.PipelineExecutionListener;
 import com.flowforge.etl.core.execution.StepExecutor;
-import com.flowforge.etl.core.extract.CsvExtractor;
-import com.flowforge.etl.core.load.CsvLoader;
-import com.flowforge.etl.core.load.SqlServerCashStagingLoader;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 import com.flowforge.etl.core.transform.CashValidator;
 import com.flowforge.etl.core.transform.UppercaseTransformer;

@@ -1,4 +1,8 @@
-package com.flowforge.etl.core.integration;
+package com.flowforge.etl.connectors.integration;
+
+
+import com.flowforge.etl.connectors.file.csv.CsvExtractor;
+import com.flowforge.etl.connectors.file.csv.CsvLoader;
 
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStep;
@@ -8,8 +12,7 @@ import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import com.flowforge.etl.core.execution.StepExecutor;
-import com.flowforge.etl.core.extract.CsvExtractor;
-import com.flowforge.etl.core.load.CsvLoader;
+
 import com.flowforge.etl.core.transform.CashValidator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;

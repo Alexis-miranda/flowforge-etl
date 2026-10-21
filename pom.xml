@@ -15,6 +15,7 @@
 
     <modules>
         <module>flowforge-core</module>
+	<module>flowforge-connectors</module>
     </modules>
 
     <properties>

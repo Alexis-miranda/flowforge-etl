@@ -1,5 +1,5 @@
 
-package com.flowforge.etl.core.extract;
+package com.flowforge.etl.connectors.file.csv;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;

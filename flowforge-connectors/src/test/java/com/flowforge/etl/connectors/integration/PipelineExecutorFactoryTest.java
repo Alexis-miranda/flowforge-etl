@@ -1,5 +1,4 @@
-
-package com.flowforge.etl.core.integration;
+package com.flowforge.etl.connectors.integration;
 
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import org.junit.jupiter.api.Test;
@@ -14,4 +13,5 @@ class PipelineExecutorFactoryTest {
 
         assertNotNull(executor);
     }
+
 }
