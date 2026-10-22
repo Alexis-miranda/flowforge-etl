@@ -1,0 +1,48 @@
+
+classDiagram
+    class PipelineDefinition {
+        <<record>>
+        +String id
+        +String name
+        +String description
+        +List~PipelineStep~ steps
+        +PipelineDefinition(id, name, description, steps)
+    }
+
+    class PipelineStep {
+        <<record>>
+        +String id
+        +String name
+        +StepType type
+        +int order
+        +StepConfiguration configuration
+        +PipelineStep(id, name, type, order)
+        +PipelineStep(id, name, type, order, configuration)
+    }
+
+    class StepConfiguration {
+        <<record>>
+        +Map~String, String~ properties
+        +StepConfiguration(properties)
+        +String get(name)
+        +boolean contains(name)
+    }
+
+    class StepType {
+        <<enumeration>>
+        EXTRACT
+        TRANSFORM
+        LOAD
+    }
+
+    class PipelineStatus {
+        <<enumeration>>
+        CREATED
+        RUNNING
+        SUCCEEDED
+        FAILED
+    }
+
+    PipelineDefinition "1" --> "0..*" PipelineStep : steps
+    PipelineStep --> StepType : type
+    PipelineStep "1" --> "1" StepConfiguration : configuration

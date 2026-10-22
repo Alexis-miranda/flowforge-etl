@@ -1,0 +1,102 @@
+
+classDiagram
+    class PipelineExecutor {
+        -Map executors
+        -PipelineExecutionListener listener
+        -PipelineExecutionRepository repository
+        +PipelineExecutor(List~StepExecutor~ stepExecutors)
+        +PipelineExecutor(List~StepExecutor~ stepExecutors, PipelineExecutionListener listener)
+        +PipelineExecutor(List~StepExecutor~ stepExecutors, PipelineExecutionListener listener, PipelineExecutionRepository repository)
+        +PipelineExecutionResult execute(PipelineDefinition pipeline)
+        -PipelineExecutionResult failExecution(PipelineExecution execution, String pipelineId, PipelineStep step, String errorMessage)
+        -PipelineExecutionResult saveResult(PipelineExecutionResult result)
+        -void notifyStatus(String pipelineId, PipelineStatus status)
+    }
+
+    class StepExecutor {
+        <<interface>>
+        +StepType supportedType()*
+        +String connectorKey()
+        +void execute(PipelineStep step, PipelineExecutionContext context)*
+    }
+
+    class PipelineExecution {
+        -String executionId
+        -String pipelineId
+        -Instant startedAt
+        -PipelineStatus status
+        -Instant finishedAt
+        +PipelineExecution(String pipelineId)
+        +void completeSuccessfully()
+        +void fail()
+        +String executionId()
+        +String pipelineId()
+        +PipelineStatus status()
+        +Instant startedAt()
+        +Instant finishedAt()
+        +PipelineExecutionResult toResult(String failedStepId, String errorMessage)
+        -void finish(PipelineStatus finalStatus)
+    }
+
+    class PipelineExecutionContext {
+        -Map data
+        +void put(String key, Object value)
+        +Object get(String key)
+        +T get(String key, Class~T~ type)
+        +boolean contains(String key)
+        +Object remove(String key)
+        +void clear()
+        +Map asMap()
+    }
+
+    class PipelineExecutionListener {
+        <<interface>>
+        +void onStatusChanged(String pipelineId, PipelineStatus status)*
+    }
+
+    class PipelineExecutionResult {
+        <<record>>
+        +String executionId
+        +String pipelineId
+        +PipelineStatus status
+        +String failedStepId
+        +String errorMessage
+        +Instant startedAt
+        +Instant finishedAt
+        +boolean succeeded()
+        +Duration duration()
+    }
+
+    class PipelineDefinition {
+        <<record>>
+    }
+
+    class PipelineStep {
+        <<record>>
+    }
+
+    class PipelineStatus {
+        <<enumeration>>
+    }
+
+    class StepType {
+        <<enumeration>>
+    }
+
+    class PipelineExecutionRepository {
+        <<interface>>
+    }
+
+    PipelineExecutor ..> StepExecutor : utiliza
+    PipelineExecutor ..> PipelineDefinition : recibe
+    PipelineExecutor ..> PipelineStep : ejecuta
+    PipelineExecutor ..> PipelineExecution : crea y finaliza
+    PipelineExecutor ..> PipelineExecutionContext : comparte datos
+    PipelineExecutor ..> PipelineExecutionListener : notifica
+    PipelineExecutor ..> PipelineExecutionRepository : guarda resultados
+    PipelineExecutor ..> PipelineExecutionResult : devuelve
+    PipelineExecution ..> PipelineExecutionResult : crea resultado
+    PipelineExecution --> PipelineStatus : estado
+    PipelineExecutionResult --> PipelineStatus : estado final
+    StepExecutor ..> PipelineStep : procesa
+    StepExecutor ..> PipelineExecutionContext : lee y escribe datos

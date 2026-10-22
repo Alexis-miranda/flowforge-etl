@@ -1,0 +1,74 @@
+
+classDiagram
+    namespace CoreDomainTests {
+        class PipelineDefinitionTest
+        class PipelineStatusTest
+        class PipelineStepTest
+        class StepConfigurationTest
+    }
+
+    namespace CoreExecutionTests {
+        class PipelineExecutionContextTest
+        class PipelineExecutionResultTest
+        class PipelineExecutionTest
+        class PipelineExecutorTest
+        class StepExecutorTest
+    }
+
+    namespace CoreRepositoryTests {
+        class InMemoryPipelineExecutionRepositoryTest
+    }
+
+    namespace CoreTransformTests {
+        class CashValidatorTest
+        class UppercaseTransformerTest
+    }
+
+    namespace CsvConnectorTests {
+        class CsvExtractorTest
+        class CsvLoaderTest
+    }
+
+    namespace SqlServerIntegrationTests {
+        class SqlServerCashStagingLoaderIntegrationTest
+    }
+
+    namespace PipelineIntegrationTests {
+        class CashPipelineIntegrationTest
+        class PipelineExecutorFactoryTest
+        class PipelineIntegrationTest
+    }
+
+    namespace SftpTests {
+        class SftpFileReaderTest
+        class SftpFileWriterTest
+        class SftpIntegrationTest
+    }
+
+    PipelineDefinitionTest ..> PipelineDefinition : tests
+    PipelineStatusTest ..> PipelineStatus : tests
+    PipelineStepTest ..> PipelineStep : tests
+    StepConfigurationTest ..> StepConfiguration : tests
+
+    PipelineExecutionContextTest ..> PipelineExecutionContext : tests
+    PipelineExecutionResultTest ..> PipelineExecutionResult : tests
+    PipelineExecutionTest ..> PipelineExecution : tests
+    PipelineExecutorTest ..> PipelineExecutor : tests
+    StepExecutorTest ..> StepExecutor : tests
+
+    InMemoryPipelineExecutionRepositoryTest ..> InMemoryPipelineExecutionRepository : tests
+    CashValidatorTest ..> CashValidator : tests
+    UppercaseTransformerTest ..> UppercaseTransformer : tests
+
+    CsvExtractorTest ..> CsvExtractor : tests
+    CsvLoaderTest ..> CsvLoader : tests
+    SqlServerCashStagingLoaderIntegrationTest ..> SqlServerCashStagingLoader : integration test
+
+    CashPipelineIntegrationTest ..> PipelineExecutor : integration test
+    PipelineExecutorFactoryTest ..> PipelineExecutor : tests factory integration
+    PipelineIntegrationTest ..> PipelineExecutor : integration test
+
+    SftpFileReaderTest ..> SftpFileReader : tests
+    SftpFileWriterTest ..> SftpFileWriter : tests
+    SftpIntegrationTest ..> SftpFileReader : integration test
+    SftpIntegrationTest ..> SftpFileWriter : integration test

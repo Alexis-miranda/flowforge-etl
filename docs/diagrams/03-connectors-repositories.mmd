@@ -1,0 +1,100 @@
+
+classDiagram
+    class PipelineExecutionRepository {
+        <<interface>>
+        +save(PipelineExecutionResult result) void
+        +findByExecutionId(String executionId) Optional~PipelineExecutionResult~
+        +findByPipelineId(String pipelineId) List~PipelineExecutionResult~
+    }
+
+    class InMemoryPipelineExecutionRepository {
+        -Map executions
+        +save(PipelineExecutionResult result) void
+        +findByExecutionId(String executionId) Optional~PipelineExecutionResult~
+        +findByPipelineId(String pipelineId) List~PipelineExecutionResult~
+    }
+
+    class StepExecutor {
+        <<interface>>
+        +supportedType() StepType
+        +connectorKey() String
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+    }
+
+    class CashValidator {
+        -Set DEFAULT_CURRENCIES
+        +supportedType() StepType
+        +connectorKey() String
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+        -validate(...)
+        -toStringMap(...)
+        -configuredCurrencies(...)
+        -requiredProperty(...)
+    }
+
+    class UppercaseTransformer {
+        +supportedType() StepType
+        +connectorKey() String
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+        -getRequiredProperty(...)
+    }
+
+    class CsvExtractor {
+        -String PATH_PROPERTY
+        -String OUTPUT_KEY_PROPERTY
+        -String DELIMITER_PROPERTY
+        -String REQUIRED_HEADERS_PROPERTY
+        +supportedType() StepType
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+        -getRequiredProperty(...)
+        -resolveDelimiter(...)
+        -parseRequiredHeaders(...)
+        -validateRequiredHeaders(...)
+        -readCsv(...)
+    }
+
+    class CsvLoader {
+        -String PATH_PROPERTY
+        -String INPUT_KEY_PROPERTY
+        -String DELIMITER_PROPERTY
+        +supportedType() StepType
+        +connectorKey() String
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+        -getRequiredProperty(...)
+        -resolveDelimiter(...)
+        -writeCsv(...)
+    }
+
+    class SqlServerCashStagingLoader {
+        -String JDBC_URL
+        +supportedType() StepType
+        +connectorKey() String
+        +execute(PipelineStep step, PipelineExecutionContext context) void
+        -stringValue(Object value) String
+    }
+
+    class PipelineExecutionResult {
+        <<record>>
+    }
+
+    class PipelineStep {
+        <<record>>
+    }
+
+    class PipelineExecutionContext {
+        -Map data
+    }
+
+    InMemoryPipelineExecutionRepository ..|> PipelineExecutionRepository
+    CashValidator ..|> StepExecutor
+    UppercaseTransformer ..|> StepExecutor
+    CsvExtractor ..|> StepExecutor
+    CsvLoader ..|> StepExecutor
+    SqlServerCashStagingLoader ..|> StepExecutor
+
+    PipelineExecutionRepository ..> PipelineExecutionResult : stores and retrieves
+    StepExecutor ..> PipelineStep : executes
+    StepExecutor ..> PipelineExecutionContext : reads and writes
+    CsvExtractor ..> PipelineExecutionContext : stores CSV records
+    CsvLoader ..> PipelineExecutionContext : reads records
+    SqlServerCashStagingLoader ..> PipelineExecutionContext : reads cash rows
