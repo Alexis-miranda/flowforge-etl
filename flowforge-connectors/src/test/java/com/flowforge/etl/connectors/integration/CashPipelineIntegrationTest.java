@@ -65,12 +65,14 @@ public class CashPipelineIntegrationTest {
                                         "outputKey", "cashRecords"
                                 ))
                         ),
+
                         new PipelineStep(
                                 "validate-cash",
                                 "Validate cash records",
                                 StepType.TRANSFORM,
                                 2,
                                 new StepConfiguration(Map.of(
+                                        "connector", "cash-validator",
                                         "inputKey", "cashRecords",
                                         "validOutputKey", "validCash",
                                         "rejectedOutputKey", "rejectedCash"

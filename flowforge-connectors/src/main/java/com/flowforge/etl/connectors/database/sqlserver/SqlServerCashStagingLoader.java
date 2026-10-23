@@ -7,20 +7,12 @@ import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import com.flowforge.etl.core.execution.StepExecutor;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.util.List;
 import java.util.Map;
 
 public class SqlServerCashStagingLoader implements StepExecutor {
-
-    private static final String JDBC_URL =
-            "jdbc:sqlserver://localhost;"
-                    + "instanceName=MSSQLSERVER01;"
-                    + "databaseName=FlowForgeETL_Dev;"
-                    + "encrypt=true;"
-                    + "trustServerCertificate=true;";
 
     @Override
     public StepType supportedType() {
@@ -58,14 +50,6 @@ public class SqlServerCashStagingLoader implements StepExecutor {
                             + "' must contain a list of rows");
         }
 
-        String user = System.getenv("FLOWFORGE_DB_USER");
-        String password = System.getenv("FLOWFORGE_DB_PASSWORD");
-
-        if (user == null || password == null) {
-            throw new IllegalStateException(
-                    "Missing FLOWFORGE_DB_USER or FLOWFORGE_DB_PASSWORD");
-        }
-
         String sql = """
                 INSERT INTO dbo.CashStaging
                     (AccountCode, AdjustmentId, Currency, Amount, SourceFile)
@@ -73,7 +57,7 @@ public class SqlServerCashStagingLoader implements StepExecutor {
                 """;
 
         try (Connection connection =
-                     DriverManager.getConnection(JDBC_URL, user, password);
+                     SqlServerConnectionFactory.openConnection();
              PreparedStatement statement =
                      connection.prepareStatement(sql)) {
 

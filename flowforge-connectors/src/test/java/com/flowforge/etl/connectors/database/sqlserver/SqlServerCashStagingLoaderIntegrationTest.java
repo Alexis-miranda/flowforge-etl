@@ -7,10 +7,8 @@ import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.sql.Connection;
-import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.List;
@@ -22,24 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SqlServerCashStagingLoaderIntegrationTest {
 
-    private static final String JDBC_URL =
-            "jdbc:sqlserver://localhost;"
-                    + "instanceName=MSSQLSERVER01;"
-                    + "databaseName=FlowForgeETL_Dev;"
-                    + "encrypt=true;"
-                    + "trustServerCertificate=true;";
-
     @Test
-    @EnabledIfEnvironmentVariable(
-            named = "FLOWFORGE_DB_USER",
-            matches = ".+")
     void shouldInsertCashRecordIntoSqlServerStaging() throws Exception {
-        String user = System.getenv("FLOWFORGE_DB_USER");
-        String password = System.getenv("FLOWFORGE_DB_PASSWORD");
-
         Assumptions.assumeTrue(
-                password != null && !password.isBlank(),
-                "FLOWFORGE_DB_PASSWORD is not configured");
+                SqlServerConnectionFactory.isConfigured(),
+                "SQL Server integration skipped: configure FLOWFORGE_DB_JDBC_URL, "
+                        + "FLOWFORGE_DB_USER and FLOWFORGE_DB_PASSWORD");
 
         String testId = UUID.randomUUID().toString();
         String accountCode = "TEST-" + testId;
@@ -82,7 +68,7 @@ class SqlServerCashStagingLoaderIntegrationTest {
                     """;
 
             try (Connection connection =
-                         DriverManager.getConnection(JDBC_URL, user, password);
+                         SqlServerConnectionFactory.openConnection();
                  PreparedStatement statement =
                          connection.prepareStatement(querySql)) {
 
@@ -112,7 +98,7 @@ class SqlServerCashStagingLoaderIntegrationTest {
             }
         } finally {
             try (Connection connection =
-                         DriverManager.getConnection(JDBC_URL, user, password);
+                         SqlServerConnectionFactory.openConnection();
                  PreparedStatement cleanup =
                          connection.prepareStatement(cleanupSql)) {
 

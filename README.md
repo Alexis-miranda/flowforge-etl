@@ -1,4 +1,4 @@
-﻿# FlowForge ETL
+# FlowForge ETL
 
 <p align="center">
   <img src="docs/images/flowforge-cover.png" alt="FlowForge ETL" width="200" />
@@ -156,14 +156,25 @@ Some integration tests are conditional and may be skipped unless their required 
 
 ### SQL Server
 
-The SQL Server cash staging loader reads credentials from environment variables:
+The SQL Server cash staging loader reads its connection settings from environment variables:
 
-- `FLOWFORGE_DB_USER`
-- `FLOWFORGE_DB_PASSWORD`
+- `FLOWFORGE_DB_JDBC_URL` — complete JDBC URL, including server, instance/database and TLS options.
+- `FLOWFORGE_DB_USER` — database username.
+- `FLOWFORGE_DB_PASSWORD` — database password.
 
-Configure these variables in your local development environment before running database operations. Never commit actual credentials to the repository.
+See [`.env.example`](.env.example) for the variable names and a local-development example. The application does not automatically load `.env` files: set the variables in your shell, IDE run configuration, or deployment environment. Never commit a real `.env` file or actual credentials.
 
-The current loader targets the `FlowForgeETL_Dev` database and the `dbo.CashStaging` table on the configured local SQL Server instance. Review the connector configuration if your SQL Server instance or database differs.
+Example for PowerShell (replace the example values with your own local settings):
+
+```powershell
+$env:FLOWFORGE_DB_JDBC_URL = "jdbc:sqlserver://localhost;instanceName=MSSQLSERVER01;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true;"
+$env:FLOWFORGE_DB_USER = "your_local_sql_user"
+$env:FLOWFORGE_DB_PASSWORD = "your_local_sql_password"
+```
+
+`trustServerCertificate=true` is intended only for local development and testing because it does not validate the server certificate. For production, use a properly trusted server certificate and configure certificate validation instead. Do not print JDBC URLs or credentials to logs.
+
+The connector writes to `dbo.CashStaging`. Ensure the configured database contains the expected table and columns before running a load.
 
 The staging table must contain the columns expected by the loader:
 

@@ -1,4 +1,4 @@
-﻿# Maven
+# Maven
 target/
 pom.xml.tag
 pom.xml.releaseBackup
@@ -27,4 +27,15 @@ out/
 Thumbs.db
 
 # Logs
+*.log
+# Local secrets and environment configuration
+.env
+.env.*
+!.env.example
+secrets/
+*.pem
+*.key
+
+# Runtime output
+logs/
 *.log
