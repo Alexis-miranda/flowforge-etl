@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -53,11 +55,6 @@ class CashSqlServerPipelineIntegrationTest {
                         + "ACC003-" + testId + ",ADJ003,XYZ,75.00\n"
                         + ",ADJ004,GBP,50.00\n",
                 StandardCharsets.UTF_8);
-
-        String cleanupSql = """
-                DELETE FROM dbo.CashStaging
-                WHERE SourceFile = ?
-                """;
 
         try {
             PipelineDefinition pipeline = new PipelineDefinition(
@@ -110,16 +107,21 @@ class CashSqlServerPipelineIntegrationTest {
             );
 
             PipelineExecutor executor = new PipelineExecutor(executors);
+
+            // Primera ejecución: la carga debe completarse correctamente.
             PipelineExecutionResult result = executor.execute(pipeline);
 
-            assertEquals(PipelineStatus.SUCCEEDED, result.status());
+            assertEquals(
+                    PipelineStatus.SUCCEEDED,
+                    result.status());
 
+            // Comprobar que se han cargado únicamente los dos registros válidos.
             String querySql = """
-                    SELECT AccountCode, AdjustmentId, Currency, Amount
-                    FROM dbo.CashStaging
-                    WHERE SourceFile = ?
-                    ORDER BY AccountCode
-                    """;
+                SELECT AccountCode, AdjustmentId, Currency, Amount
+                FROM dbo.CashStaging
+                WHERE SourceFile = ?
+                ORDER BY AccountCode
+                """;
 
             try (Connection connection =
                          SqlServerConnectionFactory.openConnection();
@@ -130,23 +132,33 @@ class CashSqlServerPipelineIntegrationTest {
 
                 try (ResultSet resultSet = statement.executeQuery()) {
                     assertTrue(resultSet.next());
-                    assertEquals("ACC001-" + testId,
+
+                    assertEquals(
+                            "ACC001-" + testId,
                             resultSet.getString("AccountCode"));
-                    assertEquals("ADJ001",
+                    assertEquals(
+                            "ADJ001",
                             resultSet.getString("AdjustmentId"));
-                    assertEquals("EUR",
+                    assertEquals(
+                            "EUR",
                             resultSet.getString("Currency"));
-                    assertEquals("150.50",
+                    assertEquals(
+                            "150.50",
                             resultSet.getString("Amount"));
 
                     assertTrue(resultSet.next());
-                    assertEquals("ACC002-" + testId,
+
+                    assertEquals(
+                            "ACC002-" + testId,
                             resultSet.getString("AccountCode"));
-                    assertEquals("ADJ002",
+                    assertEquals(
+                            "ADJ002",
                             resultSet.getString("AdjustmentId"));
-                    assertEquals("USD",
+                    assertEquals(
+                            "USD",
                             resultSet.getString("Currency"));
-                    assertEquals("200.00",
+                    assertEquals(
+                            "200.00",
                             resultSet.getString("Amount"));
 
                     assertTrue(
@@ -154,14 +166,64 @@ class CashSqlServerPipelineIntegrationTest {
                             "Only the two valid records should be loaded");
                 }
             }
-        } finally {
+
+            // Segunda ejecución: el mismo archivo debe rechazarse.
+            PipelineExecutionResult duplicateResult =
+                    executor.execute(pipeline);
+
+            assertEquals(
+                    PipelineStatus.FAILED,
+                    duplicateResult.status());
+
+            assertNotNull(duplicateResult.errorMessage());
+
+            assertTrue(
+                    duplicateResult.errorMessage()
+                            .contains("already been loaded"),
+                    "The duplicate load should explain why it was rejected");
+
+            // Verificar que el intento duplicado no ha añadido más registros.
             try (Connection connection =
                          SqlServerConnectionFactory.openConnection();
-                 PreparedStatement cleanup =
-                         connection.prepareStatement(cleanupSql)) {
+                 PreparedStatement statement =
+                         connection.prepareStatement("""
+                             SELECT COUNT_BIG(*)
+                             FROM dbo.CashStaging
+                             WHERE SourceFile = ?
+                             """)) {
 
-                cleanup.setString(1, sourceFile);
-                cleanup.executeUpdate();
+                statement.setString(1, sourceFile);
+
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    assertTrue(resultSet.next());
+                    assertEquals(2L, resultSet.getLong(1));
+                }
+            }
+
+        } finally {
+            // Limpiar los datos de prueba y el registro de control de la carga.
+            try (Connection connection =
+                         SqlServerConnectionFactory.openConnection()) {
+
+                try (PreparedStatement cleanupStaging =
+                             connection.prepareStatement("""
+                                 DELETE FROM dbo.CashStaging
+                                 WHERE SourceFile = ?
+                                 """)) {
+
+                    cleanupStaging.setString(1, sourceFile);
+                    cleanupStaging.executeUpdate();
+                }
+
+                try (PreparedStatement cleanupControl =
+                             connection.prepareStatement("""
+                                 DELETE FROM dbo.CashLoadControl
+                                 WHERE SourceFile = ?
+                                 """)) {
+
+                    cleanupControl.setString(1, sourceFile);
+                    cleanupControl.executeUpdate();
+                }
             }
         }
     }
