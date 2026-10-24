@@ -59,7 +59,13 @@ public final class SqlServerPipelineExecutionRepository
             FROM dbo.ETLExecution
             WHERE ExecutionId = ?
             """;
-
+    private static final String FIND_SNAPSHOTS_BY_PIPELINE_SQL = """
+        SELECT ExecutionId, PipelineId, Status, FailedStepId,
+               ErrorMessage, StartedAt, FinishedAt
+        FROM dbo.ETLExecution
+        WHERE PipelineId = ?
+        ORDER BY StartedAt DESC
+        """;
     private static final String FIND_RESULTS_BY_PIPELINE_SQL = """
             SELECT ExecutionId, PipelineId, Status, FailedStepId,
                    ErrorMessage, StartedAt, FinishedAt
@@ -190,7 +196,34 @@ public final class SqlServerPipelineExecutionRepository
                     exception);
         }
     }
+    @Override
+    public List<PipelineExecutionSnapshot> findSnapshotsByPipelineId(
+            String pipelineId) {
+        requireText(pipelineId, "Pipeline ID");
 
+        List<PipelineExecutionSnapshot> snapshots = new ArrayList<>();
+
+        try (Connection connection =
+                     SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(
+                             FIND_SNAPSHOTS_BY_PIPELINE_SQL)) {
+
+            statement.setString(1, pipelineId);
+
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    snapshots.add(readSnapshot(resultSet));
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Could not find pipeline execution snapshots",
+                    exception);
+        }
+
+        return List.copyOf(snapshots);
+    }
     @Override
     public List<PipelineExecutionResult> findByPipelineId(
             String pipelineId) {

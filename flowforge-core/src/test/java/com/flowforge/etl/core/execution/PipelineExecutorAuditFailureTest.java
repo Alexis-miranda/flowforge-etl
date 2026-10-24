@@ -145,6 +145,11 @@ class PipelineExecutorAuditFailureTest {
         }
 
         @Override
+        public List<PipelineExecutionSnapshot>
+        findSnapshotsByPipelineId(String pipelineId) {
+            return List.of();
+        }
+        @Override
         public List<PipelineExecutionResult>
         findByPipelineId(String pipelineId) {
             return List.of();

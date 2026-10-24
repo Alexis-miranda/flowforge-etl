@@ -58,4 +58,14 @@ public interface PipelineExecutionRepository {
      */
     Optional<PipelineExecutionResult> findByExecutionId(
             String executionId);
+
+    /**
+     * Finds all execution snapshots associated with a pipeline,
+     * including executions that are still running.
+     *
+     * @param pipelineId the pipeline identifier
+     * @return matching execution snapshots, newest first
+     */
+    List<PipelineExecutionSnapshot> findSnapshotsByPipelineId(
+            String pipelineId);
 }

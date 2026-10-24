@@ -106,6 +106,31 @@ public class InMemoryPipelineExecutionRepository
     }
 
     @Override
+    public synchronized List<PipelineExecutionSnapshot>
+    findSnapshotsByPipelineId(String pipelineId) {
+        if (pipelineId == null || pipelineId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Pipeline ID must not be null or blank");
+        }
+
+        List<PipelineExecutionSnapshot> matching = new ArrayList<>();
+
+        for (PipelineExecutionSnapshot snapshot : snapshots.values()) {
+            if (snapshot.pipelineId().equals(pipelineId)) {
+                matching.add(snapshot);
+            }
+        }
+
+        matching.sort(
+                java.util.Comparator.comparing(
+                        PipelineExecutionSnapshot::startedAt
+                ).reversed()
+        );
+
+        return List.copyOf(matching);
+    }
+
+    @Override
     public synchronized List<PipelineExecutionResult> findByPipelineId(
             String pipelineId) {
         if (pipelineId == null || pipelineId.isBlank()) {

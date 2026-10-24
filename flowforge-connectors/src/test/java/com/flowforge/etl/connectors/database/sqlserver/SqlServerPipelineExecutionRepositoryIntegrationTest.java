@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.connectors.database.sqlserver;
 
 import com.flowforge.etl.core.domain.PipelineStatus;
@@ -6,6 +5,7 @@ import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
@@ -44,6 +44,11 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         // Insert the initial RUNNING record.
         repository.start(running);
 
+        List<PipelineExecutionSnapshot> runningHistory =
+                repository.findSnapshotsByPipelineId(pipelineId);
+
+        assertEquals(1, runningHistory.size());
+        assertEquals(PipelineStatus.RUNNING, runningHistory.get(0).status());
         PipelineExecutionSnapshot persistedRunning =
                 repository.findSnapshotByExecutionId(executionId)
                         .orElseThrow(() ->

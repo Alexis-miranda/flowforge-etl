@@ -758,6 +758,12 @@ class PipelineExecutorTest {
                     findByExecutionId(String executionId) {
                         return repository.findByExecutionId(executionId);
                     }
+
+                    @Override
+                    public List<PipelineExecutionSnapshot> findSnapshotsByPipelineId(
+                            String pipelineId) {
+                        return repository.findSnapshotsByPipelineId(pipelineId);
+                    }
                 };
 
         StepExecutor checkingExecutor =

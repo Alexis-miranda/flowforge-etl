@@ -4,6 +4,7 @@ package com.flowforge.etl.core.repository;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import org.junit.jupiter.api.Test;
+import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
 
 import java.time.Instant;
 import java.util.List;
@@ -139,6 +140,116 @@ class InMemoryPipelineExecutionRepositoryTest {
                 () -> repository.findByPipelineId("   ")
         );
     }
+
+
+    @Test
+    void shouldFindSnapshotsIncludingRunningAndFinishedExecutionsNewestFirst() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        Instant olderStart = Instant.parse("2026-01-01T10:00:00Z");
+        Instant newerStart = Instant.parse("2026-01-01T11:00:00Z");
+
+        PipelineExecutionSnapshot olderRunning =
+                new PipelineExecutionSnapshot(
+                        "execution-older",
+                        "pipeline-1",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        olderStart,
+                        null);
+
+        PipelineExecutionSnapshot newerRunning =
+                new PipelineExecutionSnapshot(
+                        "execution-newer",
+                        "pipeline-1",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        newerStart,
+                        null);
+
+        repository.start(olderRunning);
+        repository.start(newerRunning);
+
+        PipelineExecutionSnapshot olderFinished =
+                new PipelineExecutionSnapshot(
+                        "execution-older",
+                        "pipeline-1",
+                        PipelineStatus.SUCCEEDED,
+                        null,
+                        null,
+                        olderStart,
+                        Instant.parse("2026-01-01T10:00:05Z"));
+
+        PipelineExecutionSnapshot newerFinished =
+                new PipelineExecutionSnapshot(
+                        "execution-newer",
+                        "pipeline-1",
+                        PipelineStatus.FAILED,
+                        "step-1",
+                        "Test failure",
+                        newerStart,
+                        Instant.parse("2026-01-01T11:00:05Z"));
+
+        repository.update(olderFinished);
+        repository.update(newerFinished);
+
+        assertEquals(
+                List.of(newerFinished, olderFinished),
+                repository.findSnapshotsByPipelineId("pipeline-1"));
+    }
+
+    @Test
+    void shouldReturnOnlySnapshotsForRequestedPipeline() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        Instant startedAt = Instant.parse("2026-01-01T10:00:00Z");
+
+        PipelineExecutionSnapshot first =
+                new PipelineExecutionSnapshot(
+                        "execution-1", "pipeline-1",
+                        PipelineStatus.RUNNING, null, null,
+                        startedAt, null);
+
+        PipelineExecutionSnapshot other =
+                new PipelineExecutionSnapshot(
+                        "execution-2", "pipeline-2",
+                        PipelineStatus.RUNNING, null, null,
+                        startedAt.plusSeconds(10), null);
+
+        repository.start(first);
+        repository.start(other);
+
+        assertEquals(
+                List.of(first),
+                repository.findSnapshotsByPipelineId("pipeline-1"));
+    }
+
+    @Test
+    void shouldReturnEmptySnapshotsWhenPipelineHasNoExecutions() {
+        assertEquals(
+                List.of(),
+                repository.findSnapshotsByPipelineId("unknown"));
+    }
+
+    @Test
+    void shouldRejectNullOrBlankPipelineIdForSnapshotHistory() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.findSnapshotsByPipelineId(null));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.findSnapshotsByPipelineId(""));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> repository.findSnapshotsByPipelineId("   "));
+    }
+
 
     @Test
     void shouldRejectConcurrentDuplicateSaves() throws Exception {
