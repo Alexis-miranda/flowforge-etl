@@ -17,6 +17,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -94,6 +95,7 @@ class CashSqlServerPipelineIntegrationTest {
                                     new StepConfiguration(Map.of(
                                             "connector", "sqlserver",
                                             "inputKey", "validCash",
+                                            "rejectedInputKey", "rejectedCash",
                                             "sourceFile", sourceFile
                                     ))
                             )
@@ -143,8 +145,9 @@ class CashSqlServerPipelineIntegrationTest {
                             "EUR",
                             resultSet.getString("Currency"));
                     assertEquals(
-                            "150.50",
-                            resultSet.getString("Amount"));
+                            0,
+                            new BigDecimal("150.50").compareTo(
+                                    resultSet.getBigDecimal("Amount")));
 
                     assertTrue(resultSet.next());
 
@@ -158,12 +161,61 @@ class CashSqlServerPipelineIntegrationTest {
                             "USD",
                             resultSet.getString("Currency"));
                     assertEquals(
-                            "200.00",
-                            resultSet.getString("Amount"));
+                            0,
+                            new BigDecimal("200.00").compareTo(
+                                    resultSet.getBigDecimal("Amount")));
 
                     assertTrue(
                             !resultSet.next(),
                             "Only the two valid records should be loaded");
+                }
+            }
+
+
+            // Comprobar que los dos registros rechazados se han guardado.
+            String rejectedSql = """
+                SELECT AccountCode, AdjustmentId, Currency, Amount,
+                       SourceFile, RejectionReason
+                FROM dbo.CashRejected
+                WHERE SourceFile = ?
+                ORDER BY AdjustmentId
+                """;
+
+            try (Connection connection =
+                         SqlServerConnectionFactory.openConnection();
+                 PreparedStatement statement =
+                         connection.prepareStatement(rejectedSql)) {
+
+                statement.setString(1, sourceFile);
+
+                try (ResultSet resultSet = statement.executeQuery()) {
+                    assertTrue(resultSet.next());
+
+                    assertEquals("ADJ003",
+                            resultSet.getString("AdjustmentId"));
+                    assertEquals("XYZ",
+                            resultSet.getString("Currency"));
+                    assertEquals("75.00",
+                            resultSet.getString("Amount"));
+                    assertEquals(sourceFile,
+                            resultSet.getString("SourceFile"));
+                    assertNotNull(resultSet.getString("RejectionReason"));
+
+                    assertTrue(resultSet.next());
+
+                    assertEquals("ADJ004",
+                            resultSet.getString("AdjustmentId"));
+                    assertEquals("GBP",
+                            resultSet.getString("Currency"));
+                    assertEquals("50.00",
+                            resultSet.getString("Amount"));
+                    assertEquals(sourceFile,
+                            resultSet.getString("SourceFile"));
+                    assertNotNull(resultSet.getString("RejectionReason"));
+
+                    assertTrue(
+                            !resultSet.next(),
+                            "Exactly two rejected records should be stored");
                 }
             }
 
@@ -205,6 +257,18 @@ class CashSqlServerPipelineIntegrationTest {
             try (Connection connection =
                          SqlServerConnectionFactory.openConnection()) {
 
+                // 1. Eliminar registros rechazados.
+                try (PreparedStatement cleanupRejected =
+                             connection.prepareStatement("""
+                                 DELETE FROM dbo.CashRejected
+                                 WHERE SourceFile = ?
+                                 """)) {
+
+                    cleanupRejected.setString(1, sourceFile);
+                    cleanupRejected.executeUpdate();
+                }
+
+                // 2. Eliminar registros válidos de staging.
                 try (PreparedStatement cleanupStaging =
                              connection.prepareStatement("""
                                  DELETE FROM dbo.CashStaging
@@ -215,6 +279,7 @@ class CashSqlServerPipelineIntegrationTest {
                     cleanupStaging.executeUpdate();
                 }
 
+                // 3. Eliminar el registro de control de carga.
                 try (PreparedStatement cleanupControl =
                              connection.prepareStatement("""
                                  DELETE FROM dbo.CashLoadControl
