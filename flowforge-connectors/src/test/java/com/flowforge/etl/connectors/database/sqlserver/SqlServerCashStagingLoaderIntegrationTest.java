@@ -86,8 +86,12 @@ class SqlServerCashStagingLoaderIntegrationTest {
                             resultSet.getString("AdjustmentId"));
                     assertEquals("EUR",
                             resultSet.getString("Currency"));
-                    assertEquals("123.45",
-                            resultSet.getString("Amount"));
+                    assertEquals(
+                            0,
+                            new java.math.BigDecimal("123.45")
+                                    .compareTo(resultSet.getBigDecimal("Amount")),
+                            "The stored amount should equal 123.45"
+                    );
                     assertEquals(sourceFile,
                             resultSet.getString("SourceFile"));
 

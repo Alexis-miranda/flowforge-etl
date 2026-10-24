@@ -7,10 +7,12 @@ import com.flowforge.etl.core.domain.StepConfiguration;
 import com.flowforge.etl.core.domain.StepType;
 import org.junit.jupiter.api.Test;
 import com.flowforge.etl.core.repository.InMemoryPipelineExecutionRepository;
+import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -606,6 +608,33 @@ class PipelineExecutorTest {
     }
 
 
+
+    @Test
+    void shouldPersistFinalSnapshotAfterSuccessfulExecution() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                repository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        var snapshot = repository
+                .findSnapshotByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(PipelineStatus.SUCCEEDED, snapshot.status());
+        assertEquals(result.executionId(), snapshot.executionId());
+        assertEquals(result.pipelineId(), snapshot.pipelineId());
+        assertNotNull(snapshot.startedAt());
+        assertNotNull(snapshot.finishedAt());
+    }
+
     @Test
     void shouldSaveFailedExecutionResultToRepository() {
         InMemoryPipelineExecutionRepository repository =
@@ -682,6 +711,118 @@ class PipelineExecutorTest {
                 savedResults.get(1).executionId()
         );
     }
+
+
+    @Test
+    void shouldPersistRunningSnapshotBeforeExecutingSteps() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        List<PipelineStatus> observedStatuses = new ArrayList<>();
+
+        PipelineExecutionRepository checkingRepository =
+                new PipelineExecutionRepository() {
+                    @Override
+                    public void start(PipelineExecutionSnapshot snapshot) {
+                        assertEquals(PipelineStatus.RUNNING, snapshot.status());
+                        assertNull(snapshot.finishedAt());
+
+                        observedStatuses.add(snapshot.status());
+                        repository.start(snapshot);
+                    }
+
+                    @Override
+                    public void update(PipelineExecutionSnapshot snapshot) {
+                        repository.update(snapshot);
+                    }
+
+                    @Override
+                    public void save(PipelineExecutionResult result) {
+                        repository.save(result);
+                    }
+
+                    @Override
+                    public java.util.Optional<PipelineExecutionSnapshot>
+                    findSnapshotByExecutionId(String executionId) {
+                        return repository.findSnapshotByExecutionId(executionId);
+                    }
+
+                    @Override
+                    public List<PipelineExecutionResult> findByPipelineId(
+                            String pipelineId) {
+                        return repository.findByPipelineId(pipelineId);
+                    }
+
+                    @Override
+                    public java.util.Optional<PipelineExecutionResult>
+                    findByExecutionId(String executionId) {
+                        return repository.findByExecutionId(executionId);
+                    }
+                };
+
+        StepExecutor checkingExecutor =
+                createExecutor(StepType.EXTRACT, new ArrayList<>());
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(checkingExecutor),
+                null,
+                checkingRepository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        PipelineExecutionSnapshot finalSnapshot =
+                checkingRepository
+                        .findSnapshotByExecutionId(result.executionId())
+                        .orElseThrow();
+
+        assertEquals(
+                List.of(PipelineStatus.RUNNING),
+                observedStatuses
+        );
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(PipelineStatus.SUCCEEDED, finalSnapshot.status());
+        assertEquals(result.executionId(), finalSnapshot.executionId());
+        assertNotNull(finalSnapshot.startedAt());
+        assertNotNull(finalSnapshot.finishedAt());
+    }
+
+
+    @Test
+    void shouldPersistFinalSnapshotAfterFailedExecution() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                repository
+        );
+
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)
+        ));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        PipelineExecutionSnapshot snapshot = repository
+                .findSnapshotByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals(PipelineStatus.FAILED, snapshot.status());
+        assertEquals(result.executionId(), snapshot.executionId());
+        assertEquals(result.pipelineId(), snapshot.pipelineId());
+        assertNotNull(snapshot.startedAt());
+        assertNotNull(snapshot.finishedAt());
+        assertNotNull(snapshot.errorMessage());
+    }
+
+
 
 
     private StepExecutor createExecutorWithConnector(

@@ -102,7 +102,6 @@ public class PipelineExecutor {
      *
      * @param pipeline the pipeline definition
      * @return the detailed execution result
-     * @throws IllegalArgumentException if the pipeline is null
      */
     public PipelineExecutionResult execute(PipelineDefinition pipeline) {
         if (pipeline == null) {
@@ -116,6 +115,7 @@ public class PipelineExecutor {
         PipelineExecutionContext context =
                 new PipelineExecutionContext();
 
+        persistStart(execution);
         notifyStatus(pipeline.id(), execution.status());
 
         for (PipelineStep step : pipeline.steps()) {
@@ -199,13 +199,46 @@ public class PipelineExecutor {
                 execution.toResult(step.id(), errorMessage));
     }
 
+    private void persistStart(PipelineExecution execution) {
+        if (repository == null) {
+            return;
+        }
+
+        repository.start(toSnapshot(execution, null, null));
+    }
+
+    private PipelineExecutionSnapshot toSnapshot(
+            PipelineExecution execution,
+            String failedStepId,
+            String errorMessage) {
+
+        return new PipelineExecutionSnapshot(
+                execution.executionId(),
+                execution.pipelineId(),
+                execution.status(),
+                failedStepId,
+                errorMessage,
+                execution.startedAt(),
+                execution.finishedAt());
+    }
+
     /**
-     * Saves a completed execution result when a repository is configured.
+     * Saves the final snapshot and result when a repository is configured.
      */
     private PipelineExecutionResult saveResult(
             PipelineExecutionResult result) {
 
         if (repository != null) {
+            repository.update(
+                    new PipelineExecutionSnapshot(
+                            result.executionId(),
+                            result.pipelineId(),
+                            result.status(),
+                            result.failedStepId(),
+                            result.errorMessage(),
+                            result.startedAt(),
+                            result.finishedAt()));
+
             repository.save(result);
         }
 

@@ -1,7 +1,8 @@
-
 package com.flowforge.etl.connectors.integration;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerCashStagingLoader;
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerPipelineExecutionRepository;
 import com.flowforge.etl.connectors.file.csv.CsvExtractor;
 import com.flowforge.etl.connectors.file.csv.CsvLoader;
 import com.flowforge.etl.core.execution.PipelineExecutor;
@@ -23,10 +24,15 @@ public final class PipelineExecutorFactory {
     }
 
     /**
-     * Creates a pipeline executor with all built-in ETL components.
+     * Creates a pipeline executor using SQL audit persistence when configured.
      */
     public static PipelineExecutor create() {
-        return create(null, null);
+        PipelineExecutionRepository repository =
+                SqlServerConnectionFactory.isConfigured()
+                        ? new SqlServerPipelineExecutionRepository()
+                        : null;
+
+        return create(null, repository);
     }
 
     /**
