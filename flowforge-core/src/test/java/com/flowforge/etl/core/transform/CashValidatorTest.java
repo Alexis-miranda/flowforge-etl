@@ -146,6 +146,62 @@ class CashValidatorTest {
         );
     }
 
+    @Test
+    void shouldNormalizeCurrencyInValidRecords() {
+        var step = step(Map.of(
+                "inputKey", "cash",
+                "validOutputKey", "valid",
+                "rejectedOutputKey", "rejected"
+        ));
+
+        var context = new PipelineExecutionContext();
+        context.put("cash", List.of(
+                Map.of(
+                        "accountCode", "ACC001",
+                        "adjustmentId", "ADJ001",
+                        "currency", " chf ",
+                        "amount", "10.00"
+                )
+        ));
+
+        validator.execute(step, context);
+
+        List<?> valid = context.get("valid", List.class);
+        Map<?, ?> accepted = (Map<?, ?>) valid.get(0);
+
+        assertEquals("CHF", accepted.get("currency"));
+        assertEquals("10.00", accepted.get("amount"));
+        assertTrue(context.get("rejected", List.class).isEmpty());
+    }
+
+    @Test
+    void shouldPreserveOriginalCurrencyInRejectedRecords() {
+        var step = step(Map.of(
+                "inputKey", "cash",
+                "validOutputKey", "valid",
+                "rejectedOutputKey", "rejected"
+        ));
+
+        var context = new PipelineExecutionContext();
+        context.put("cash", List.of(
+                Map.of(
+                        "accountCode", "ACC001",
+                        "adjustmentId", "ADJ001",
+                        "currency", " xyz ",
+                        "amount", "10.00"
+                )
+        ));
+
+        validator.execute(step, context);
+
+        List<?> rejected = context.get("rejected", List.class);
+        Map<?, ?> record = (Map<?, ?>) rejected.get(0);
+
+        assertEquals(" xyz ", record.get("currency"));
+        assertEquals("Unsupported currency:  xyz ", record.get("rejectionReason"));
+        assertTrue(context.get("valid", List.class).isEmpty());
+    }
+
     private PipelineStep step(Map<String, String> properties) {
         return new PipelineStep(
                 "cash-validation",

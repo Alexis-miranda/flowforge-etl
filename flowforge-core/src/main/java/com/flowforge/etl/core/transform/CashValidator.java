@@ -88,6 +88,10 @@ public class CashValidator implements StepExecutor {
             String rejectionReason = validate(cashRecord, currencies);
 
             if (rejectionReason == null) {
+                cashRecord.put(
+                        "currency",
+                        cashRecord.get("currency").trim().toUpperCase(Locale.ROOT)
+                );
                 validRecords.add(Map.copyOf(cashRecord));
             } else {
                 Map<String, String> rejected =
