@@ -21,211 +21,279 @@
 
 ## About
 
-**FlowForge ETL** is a modular and extensible platform for building and executing Extract, Transform, Load (ETL) pipelines.
+**FlowForge ETL** is a modular ETL platform built with Java 21 and Apache Maven. It separates the pipeline execution engine from external connectors and provides a shared execution context, sequential step execution, automated tests, and integration with files and external systems.
 
-Built with Java 21 and Apache Maven, the project separates its core pipeline execution engine from its external connectors. This architecture is designed to support maintainable workflows, independently developed integrations, and automated testing.
-
-The current implementation includes CSV processing, sequential pipeline execution, SQL Server staging support, and secure SFTP file transfers.
+The current implementation includes CSV processing, Cash validation and persistence in SQL Server, FRONT CSV output delivery with recovery of pending publications, and SFTP file transfers.
 
 ## Features
 
-- **CSV Extraction** — read structured records from CSV files.
-- **Data Transformation** — transform selected column values to uppercase.
-- **CSV Loading** — write processed records to CSV files.
-- **Pipeline Execution** — execute configured pipeline steps sequentially.
-- **Shared Execution Context** — transfer data between pipeline steps.
-- **Execution Tracking** — capture execution status, duration, and failure details.
-- **SQL Server Integration** — load cash-related records into a SQL Server staging table.
-- **SFTP File Transfers** — upload and download files using SSH File Transfer Protocol.
-- **SSH Host Verification** — verify SFTP server host keys against a known-hosts file.
-- **Automated Testing** — validate components with unit tests and opt-in integration tests.
-- **Modular Architecture** — separate core execution logic from external system integrations.
+- **CSV extraction:** read input records, including UTF-8 CSV files.
+- **Data validation:** validate required Cash fields, supported currencies, and decimal amounts.
+- **Currency normalization:** accepted currency codes are trimmed and converted to uppercase.
+- **CSV serialization:** configure output columns and their order; serialize in UTF-8.
+- **SQL Server persistence:** record accepted and rejected Cash data and register load and delivery state.
+- **Output delivery:** persist the prepared output payload and its SHA-256 hash before publishing the file.
+- **Delivery recovery:** retry pending FRONT output deliveries without rerunning the Cash ingestion pipeline.
+- **Pipeline execution:** execute steps sequentially through the shared execution context.
+- **Execution tracking:** capture execution status, duration, and failure details.
+- **SFTP:** upload and download files with SSH host-key verification.
+- **Automated testing:** run unit tests and optional integration tests.
 
 ## Architecture
 
-FlowForge ETL is organized as a Maven multi-module project.
+FlowForge ETL is a Maven multi-module project.
 
 | Module | Responsibility |
 | --- | --- |
-| `flowforge-core` | Pipeline domain model, execution engine, shared context, transformations, and execution results |
-| `flowforge-connectors` | CSV, SQL Server, and SFTP integrations, along with connector registration and pipeline executor wiring |
+| `flowforge-core` | Pipeline domain model, execution engine, shared context, validation and transformations |
+| `flowforge-connectors` | CSV, SQL Server and SFTP connectors, pipeline wiring and command-line entry points |
 
 ### Core module
 
-The `flowforge-core` module contains the engine-independent building blocks used to define and execute pipelines.
+The `flowforge-core` module provides the engine-independent building blocks used to define and execute pipelines.
 
 | Component | Responsibility |
 | --- | --- |
-| `domain` | Pipeline definitions, steps, configurations, and execution statuses |
-| `execution` | Pipeline execution, shared context, results, and listeners |
-| `extract` | Core extraction abstractions and related functionality |
-| `transform` | Data transformation logic |
-| `load` | Core loading abstractions and related functionality |
+| `domain` | Pipeline definitions, steps, configurations and execution statuses |
+| `execution` | Pipeline execution, shared context, results and listeners |
+| `extract` | Extraction abstractions |
+| `transform` | Validation and transformation logic |
+| `load` | Loading abstractions |
 
 ### Connectors module
 
-The `flowforge-connectors` module provides integrations with external systems.
-
 | Connector | Current capability |
 | --- | --- |
-| CSV | Read and write CSV files |
-| SQL Server | Load records into the `dbo.CashStaging` table |
+| CSV | Read, serialize and write CSV files |
+| SQL Server | Persist Cash staging, rejected records, master records, load control and output delivery state |
 | SFTP | Upload and download files with SSH host-key verification |
-| RabbitMQ | Planned; connector implementation pending |
-| IBM MQ | Planned; connector implementation pending |
+| RabbitMQ | Planned; implementation pending |
+| IBM MQ | Planned; implementation pending |
 
-### ETL Workflow
+## Cash ETL workflow
 
-<p align="center">
-  <img src="docs/images/flowforge-workflow.png" alt="FlowForge ETL workflow: CSV extraction, transformation, and loading" width="350" />
-</p>
+The Cash command-line pipeline runs these steps in order:
 
-A basic pipeline follows these steps:
+1. **Extract:** read the input CSV.
+2. **Validate:** check required fields, currency codes and amounts; separate accepted and rejected records.
+3. **Prepare FRONT output:** serialize accepted records using the configured output columns and calculate the SHA-256 hash.
+4. **Persist:** use SQL Server to register the load, store accepted and rejected records, store master records, and register a pending output delivery when a prepared payload is available.
+5. **Publish:** retrieve the pending payload from SQL Server, verify its hash, publish the file and mark the delivery as published.
 
-1. **Extract** — read records from an input source.
-2. **Transform** — apply the configured transformation logic.
-3. **Load** — write the resulting records to a destination.
+The SQL transaction registers the Cash data and pending output delivery together. Publication is handled separately so that a failed file write can be retried through the recovery command without rerunning the ingestion pipeline.
 
-The core engine executes steps in sequence and uses a shared execution context to pass data between them. Connectors provide the integration-specific operations.
+### Input requirements
 
-The SQL Server cash staging connector is implemented, but the complete Cash ETL workflow still requires end-to-end validation.
+The Cash validator expects these canonical input column names:
 
-## Technology Stack
+- `accountCode`
+- `adjustmentId`
+- `currency`
+- `amount`
 
-| Technology | Purpose |
+The default allowed currencies are `EUR`, `USD`, `GBP` and `CHF`. Currency matching is case-insensitive and ignores surrounding whitespace. Accepted records store the normalized currency code. Rejected records retain the original field values and include a rejection reason.
+
+Amounts are validated as decimal values. Their original textual representation is retained for CSV serialization; SQL persistence converts valid amounts to the configured decimal type.
+
+The input CSV must use the canonical field names expected by the pipeline. The CLI does not automatically apply arbitrary source-to-canonical column mappings.
+
+### FRONT output
+
+The default output columns are:
+
+`accountCode,currency,amount`
+
+The output serializer supports a configured column list and writes UTF-8 CSV with a header. The default delimiter is a comma.
+
+Output filenames follow this pattern:
+
+`newcash_XXX_YYYYMMDD_HHMMSS.csv`
+
+- `XXX` is the BackOffice code supplied to the CLI.
+- The timestamp identifies the output filename generation time.
+
+The filename pattern is an implementation convention; the official FRONT file contract, column mapping, and BackOffice codes must be confirmed with the relevant system specification before production integration.
+
+## SQL Server persistence
+
+The Cash pipeline uses the following tables:
+
+| Table | Purpose |
 | --- | --- |
-| Java 21 | Application development |
-| Apache Maven | Multi-module build and dependency management |
-| Apache Commons CSV | CSV parsing and writing |
-| Microsoft SQL Server JDBC Driver | Database connectivity |
-| Apache MINA SSHD | SSH and SFTP client functionality |
-| JUnit Jupiter 5 | Automated testing |
-| Docker | Local SFTP integration testing |
+| `dbo.CashLoadControl` | Register a source file and its load time |
+| `dbo.CashStaging` | Store accepted Cash records for staging |
+| `dbo.CashRejected` | Store rejected records and their rejection reasons |
+| `dbo.T_MASTER_CASH` | Preserve master records, processing status and raw-record information |
+| `dbo.CashOutputDelivery` | Persist the serialized output payload, SHA-256 hash, publication status and error details |
+| `dbo.ETLExecution` | Execution audit schema, where configured by the application |
 
-## Getting Started
+SQL schema scripts are maintained under `docs/sql/`. Apply the appropriate schema scripts to the target development database before running the pipeline. Verify the actual table definitions and database permissions for your environment.
+
+The output-delivery state is tracked as `PENDING` or `PUBLISHED`. The publisher verifies the payload hash before publication. If a file already exists at the target path, the publisher verifies its contents rather than blindly overwriting it.
+
+## Getting started
 
 ### Prerequisites
 
 - JDK 21
 - Apache Maven
 - Git
+- Microsoft SQL Server for Cash database integration
+- Docker Desktop for the optional local SFTP integration test
 
-Additional requirements depend on the integration being tested:
+Verify the environment:
 
-- Microsoft SQL Server and valid database credentials for database integration.
-- Docker Desktop for the local SFTP integration test.
-
-Verify your environment:
-
-```bash
+```powershell
 java -version
 mvn -version
 git --version
 ```
 
-### Clone the Repository
+### Clone the repository
 
-```bash
+```powershell
 git clone https://github.com/Alexis-miranda/flowforge-etl.git
 cd flowforge-etl
 ```
 
-### Validate, Build, and Test
+### Build and test
 
 Validate the Maven project:
 
-```bash
+```powershell
 mvn validate
 ```
 
-Build all modules and run the test suite:
+Run the connector module tests and required upstream modules:
 
-```bash
-mvn clean verify
-```
-
-To run tests for the connectors module and its required modules:
-
-```bash
+```powershell
 mvn -pl flowforge-connectors -am test
 ```
 
-Some integration tests are conditional and may be skipped unless their required environment and services are configured.
+Build and verify all modules:
+
+```powershell
+mvn clean verify
+```
+
+Some integration tests are conditional and may be skipped unless the required services and environment variables are configured.
 
 ## Configuration
 
 ### SQL Server
 
-The SQL Server cash staging loader reads its connection settings from environment variables:
+The Cash SQL Server connector reads these environment variables:
 
-- `FLOWFORGE_DB_JDBC_URL` — complete JDBC URL, including server, instance/database and TLS options.
+- `FLOWFORGE_DB_JDBC_URL` — JDBC connection URL.
 - `FLOWFORGE_DB_USER` — database username.
 - `FLOWFORGE_DB_PASSWORD` — database password.
 
-See [`.env.example`](.env.example) for the variable names and a local-development example. The application does not automatically load `.env` files: set the variables in your shell, IDE run configuration, or deployment environment. Never commit a real `.env` file or actual credentials.
-
-Example for PowerShell (replace the example values with your own local settings):
+Example for PowerShell (replace the example values with your own settings):
 
 ```powershell
-$env:FLOWFORGE_DB_JDBC_URL = "jdbc:sqlserver://localhost;instanceName=MSSQLSERVER01;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true;"
+$env:FLOWFORGE_DB_JDBC_URL = "jdbc:sqlserver://localhost:1433;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true"
 $env:FLOWFORGE_DB_USER = "your_local_sql_user"
 $env:FLOWFORGE_DB_PASSWORD = "your_local_sql_password"
 ```
 
-`trustServerCertificate=true` is intended only for local development and testing because it does not validate the server certificate. For production, use a properly trusted server certificate and configure certificate validation instead. Do not print JDBC URLs or credentials to logs.
+The port, instance configuration, database name, encryption options and credentials must match your SQL Server installation. The application does not automatically load `.env` files; set variables in the shell, IDE run configuration or deployment environment.
 
-The connector writes to `dbo.CashStaging`. Ensure the configured database contains the expected table and columns before running a load.
-
-The staging table must contain the columns expected by the loader:
-
-- `AccountCode`
-- `AdjustmentId`
-- `Currency`
-- `Amount`
-- `SourceFile`
-
-Confirm the actual schema and data types in your database before running a load.
+`trustServerCertificate=true` is intended for local development and testing. For production, configure a trusted server certificate and certificate validation. Never commit actual credentials or print secrets in logs.
 
 ### SFTP
 
-The SFTP connector uses Apache MINA SSHD to transfer files.
+The SFTP connector uses Apache MINA SSHD. Server host keys are verified against the configured SSH `known_hosts` file.
 
-Server host keys are verified against the user's SSH `known_hosts` file. Host-key verification should remain enabled; do not disable it to work around connection errors.
+For local integration testing, start the development SFTP server using the repository's Compose configuration. The integration test expects a server at `localhost:2222` and suitable test credentials and host-key configuration.
 
-A local SFTP test server can be started with Docker using the Compose configuration maintained for development. The integration test expects a server accessible at `localhost:2222`.
+Do not disable host-key verification to work around connection errors.
 
-Use test-only credentials for local development and never expose production credentials in source code or documentation.
+## Running the Cash pipeline
 
-## Testing
+The CLI class is:
 
-The project includes unit tests for connector behavior and integration tests for external-system interactions.
+`com.flowforge.etl.connectors.cli.CashPipelineCli`
 
-### Run the standard test suite
+Its arguments are:
 
-```bash
+```text
+<input.csv> <backOfficeCode> <outputDir> [columns] [sourceFile]
+```
+
+- `input.csv`: path to the input CSV.
+- `backOfficeCode`: BackOffice code used in the output filename.
+- `outputDir`: destination directory for the FRONT CSV.
+- `columns`: optional comma-separated output column names; defaults to `accountCode,currency,amount`.
+- `sourceFile`: optional source-file identifier used for load and delivery tracking.
+
+Build the project first:
+
+```powershell
 mvn -pl flowforge-connectors -am test
 ```
 
-### Run the SFTP integration test
+For local command-line execution, build the connector module and create or refresh its dependency classpath as required by the project build. Then run the CLI with the compiled classes and dependency JARs on the Java classpath.
 
-Start the local SFTP test server and ensure its host key is present in your user's `known_hosts` file.
+Example invocation (replace paths and values with your local settings):
 
-In PowerShell, enable the integration test for the current session:
+```powershell
+java -cp "<connector-classes>;<core-classes>;<dependency-jars>" `
+  com.flowforge.etl.connectors.cli.CashPipelineCli `
+  ".\input\cash.csv" `
+  "YOUR_BACKOFFICE_CODE" `
+  ".\output"
+```
+
+The SQL Server environment variables must be set in the same PowerShell session before running the pipeline.
+
+## Recovering pending output deliveries
+
+If SQL Server contains deliveries in `PENDING` state because publication failed, the recovery CLI can retry them without rerunning ingestion.
+
+The recovery entry point is:
+
+`com.flowforge.etl.connectors.cli.CashOutputRecoveryCli`
+
+From the repository root, after compiling the modules, run:
+
+```powershell
+$deps = (Get-Content .\flowforge-connectors\connectors-classpath.txt -Raw).Trim()
+$cp = ".\flowforge-connectors\target\classes;.\flowforge-core\target\classes;$deps"
+java -cp $cp com.flowforge.etl.connectors.cli.CashOutputRecoveryCli
+```
+
+The dependency classpath file must exist and contain the dependency JAR paths for the local build. The recovery command finds pending deliveries, verifies payload integrity, attempts publication and updates delivery status. It does not execute the extraction, validation or Cash persistence stages.
+
+If no pending deliveries exist, the CLI reports that there are no pending FRONT output deliveries. Review the `LastError` field in `dbo.CashOutputDelivery` when troubleshooting a failed publication.
+
+## Testing
+
+### Standard test suite
+
+```powershell
+mvn -pl flowforge-connectors -am test
+```
+
+### SFTP integration test
+
+Start the local SFTP test server and ensure its host key is available in your user's `known_hosts` file.
+
+Enable the integration test for the current PowerShell session:
 
 ```powershell
 $env:FLOWFORGE_SFTP_INTEGRATION = "true"
 mvn -pl flowforge-connectors -am -Dtest=SftpIntegrationTest -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
-Remove the environment variable when finished:
+Remove the variable when finished:
 
 ```powershell
 Remove-Item Env:FLOWFORGE_SFTP_INTEGRATION -ErrorAction SilentlyContinue
 ```
 
-The integration test transfers a file to the SFTP server, downloads it, and verifies that the file contents match.
+The integration test transfers a file to the SFTP server, downloads it and verifies the contents.
 
-## Project Structure
+## Project structure
 
 ```text
 flowforge-etl/
@@ -238,38 +306,44 @@ flowforge-etl/
 │   ├── pom.xml
 │   └── src/
 │       ├── main/java/com/flowforge/etl/connectors/
+│       │   ├── cli/
 │       │   ├── file/csv/
 │       │   ├── database/sqlserver/
 │       │   ├── integration/
 │       │   └── sftp/
 │       └── test/java/
 └── docs/
-    └── images/
+    ├── images/
+    └── sql/
 ```
 
-This is a simplified view of the repository structure; individual packages may contain additional classes and tests.
+This is a simplified view; individual packages may contain additional classes and tests.
 
-## Project Status
+## Project status
 
 **Under active development**
 
-The core execution engine and several connectors are implemented. Automated tests cover core and connector behavior, and the SFTP integration test can be enabled against a local test server.
+Implemented capabilities include the core execution engine, CSV extraction and serialization, Cash validation, SQL Server persistence, output-delivery tracking, publication recovery, SFTP transfers and SSH host-key verification.
 
-The complete Cash ETL workflow, including source-file ingestion, staging validation, and end-to-end execution, remains to be verified.
+The Cash pipeline and output-recovery path have been exercised in a development environment, and the Maven connector test suite has passed with one SFTP integration test skipped. This does not by itself constitute production certification.
+
+Before production use, confirm the official FRONT contract, required field mappings, BackOffice identifiers, operational monitoring, database permissions and deployment-specific security settings.
 
 ## Roadmap
 
 - [x] Core pipeline execution
 - [x] Shared execution context
-- [x] CSV extraction and loading
+- [x] CSV extraction and serialization
 - [x] Uppercase transformation
 - [x] Execution status tracking
 - [x] Maven multi-module architecture
-- [x] SQL Server cash staging loader implementation
-- [x] SFTP file transfer support
+- [x] SQL Server Cash persistence
+- [x] Accepted/rejected record handling
+- [x] FRONT output delivery tracking
+- [x] Pending output recovery
+- [x] SFTP transfer support
 - [x] SSH host-key verification
-- [x] SFTP integration test
-- [ ] End-to-end Cash ETL validation
+- [ ] Confirm official FRONT specification and production mappings
 - [ ] Additional transformation types
 - [ ] RabbitMQ integration
 - [ ] IBM MQ integration
