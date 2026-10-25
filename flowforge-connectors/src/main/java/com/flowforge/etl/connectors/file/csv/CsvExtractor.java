@@ -7,6 +7,7 @@ import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import com.flowforge.etl.core.execution.StepExecutor;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
+import java.nio.charset.StandardCharsets;
 import org.apache.commons.csv.CSVRecord;
 
 import java.io.BufferedReader;
@@ -42,7 +43,7 @@ public class CsvExtractor implements StepExecutor {
     /**
      * Reads a CSV file and stores its records in the execution context.
      *
-     * @param step the pipeline step to execute
+     * @param step    the pipeline step to execute
      * @param context the shared pipeline execution context
      */
     @Override
@@ -85,6 +86,7 @@ public class CsvExtractor implements StepExecutor {
 
         return value;
     }
+
     /**
      * Resolves the configured CSV delimiter.
      *
@@ -104,6 +106,7 @@ public class CsvExtractor implements StepExecutor {
 
         return value.charAt(0);
     }
+
     /**
      * Parses the configured list of required CSV headers.
      *
@@ -120,10 +123,11 @@ public class CsvExtractor implements StepExecutor {
                 .filter(header -> !header.isEmpty())
                 .toList();
     }
+
     /**
      * Validates that all required headers are present in the CSV file.
      *
-     * @param headers headers found in the CSV file
+     * @param headers         headers found in the CSV file
      * @param requiredHeaders headers required by the pipeline configuration
      * @throws IllegalArgumentException if required headers are missing
      */
@@ -145,8 +149,8 @@ public class CsvExtractor implements StepExecutor {
     /**
      * Reads CSV records and validates the required headers.
      *
-     * @param filePath path to the CSV file
-     * @param delimiter CSV field delimiter
+     * @param filePath        path to the CSV file
+     * @param delimiter       CSV field delimiter
      * @param requiredHeaders headers that must be present
      * @return a list of CSV records represented as maps
      */
@@ -162,35 +166,45 @@ public class CsvExtractor implements StepExecutor {
                 .get();
 
         try (
-                BufferedReader reader =
-                        Files.newBufferedReader(Path.of(filePath));
-                CSVParser parser = format.parse(reader)
+                BufferedReader reader = Files.newBufferedReader(
+                        Path.of(filePath),
+                        StandardCharsets.UTF_8
+                )
         ) {
-            List<Map<String, String>> records = new ArrayList<>();
+            // Elimina el BOM UTF-8 si existe al principio del archivo.
+            reader.mark(1);
 
-            List<String> headers = parser.getHeaderNames();
-            validateRequiredHeaders(headers, requiredHeaders);
-
-            for (CSVRecord record : parser) {
-                if (record.size() != headers.size()) {
-                    throw new IllegalArgumentException(
-                            "Invalid number of fields in CSV record at line "
-                                    + record.getRecordNumber()
-                                    + ": expected " + headers.size()
-                                    + " but found " + record.size()
-                    );
-                }
-
-                Map<String, String> row = new LinkedHashMap<>();
-
-                for (String header : headers) {
-                    row.put(header, record.get(header));
-                }
-
-                records.add(Map.copyOf(row));
+            if (reader.read() != '\uFEFF') {
+                reader.reset();
             }
 
-            return records;
+            try (CSVParser parser = format.parse(reader)) {
+                List<Map<String, String>> records = new ArrayList<>();
+
+                List<String> headers = parser.getHeaderNames();
+                validateRequiredHeaders(headers, requiredHeaders);
+
+                for (CSVRecord record : parser) {
+                    if (record.size() != headers.size()) {
+                        throw new IllegalArgumentException(
+                                "Invalid number of fields in CSV record at line "
+                                        + record.getRecordNumber()
+                                        + ": expected " + headers.size()
+                                        + " but found " + record.size()
+                        );
+                    }
+
+                    Map<String, String> row = new LinkedHashMap<>();
+
+                    for (String header : headers) {
+                        row.put(header, record.get(header));
+                    }
+
+                    records.add(Map.copyOf(row));
+                }
+
+                return records;
+            }
         } catch (IOException exception) {
             throw new UncheckedIOException(
                     "Failed to read CSV file: " + filePath,
@@ -199,4 +213,3 @@ public class CsvExtractor implements StepExecutor {
         }
     }
 }
-

@@ -13,13 +13,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
-/**
- * Validates cash records and separates accepted and rejected records.
- */
 public class CashValidator implements StepExecutor {
 
     private static final Set<String> DEFAULT_CURRENCIES =
             Set.of("EUR", "USD", "GBP", "CHF");
+
+    private static final String SOURCE_ROW_NUMBER = "_sourceRowNumber";
 
     @Override
     public StepType supportedType() {
@@ -30,33 +29,37 @@ public class CashValidator implements StepExecutor {
     public String connectorKey() {
         return "cash-validator";
     }
+
     @Override
     public void execute(
             PipelineStep step,
-            PipelineExecutionContext context
-    ) {
+            PipelineExecutionContext context) {
+
         String inputKey = requiredProperty(step, "inputKey");
         String validOutputKey = requiredProperty(step, "validOutputKey");
         String rejectedOutputKey = requiredProperty(step, "rejectedOutputKey");
 
         if (validOutputKey.equals(rejectedOutputKey)) {
             throw new IllegalArgumentException(
-                    "Valid and rejected output keys must be different"
-            );
+                    "Valid and rejected output keys must be different");
+        }
+
+        if (inputKey.equals(validOutputKey)
+                || inputKey.equals(rejectedOutputKey)) {
+            throw new IllegalArgumentException(
+                    "Input and output keys must be different");
         }
 
         if (!context.contains(inputKey)) {
             throw new IllegalArgumentException(
-                    "Missing input data in execution context: " + inputKey
-            );
+                    "Missing input data in execution context: " + inputKey);
         }
 
         Object input = context.get(inputKey);
 
         if (!(input instanceof List<?> records)) {
             throw new IllegalArgumentException(
-                    "Input data must be a list of records: " + inputKey
-            );
+                    "Input data must be a list of records: " + inputKey);
         }
 
         Set<String> currencies = configuredCurrencies(step);
@@ -64,20 +67,31 @@ public class CashValidator implements StepExecutor {
         List<Map<String, String>> validRecords = new ArrayList<>();
         List<Map<String, String>> rejectedRecords = new ArrayList<>();
 
-        for (Object record : records) {
+        for (int index = 0; index < records.size(); index++) {
+            Object record = records.get(index);
+
             if (!(record instanceof Map<?, ?> row)) {
                 throw new IllegalArgumentException(
-                        "Each input record must be a map"
-                );
+                        "Each input record must be a map");
             }
 
             Map<String, String> cashRecord = toStringMap(row);
+
+            if (cashRecord.containsKey(SOURCE_ROW_NUMBER)) {
+                throw new IllegalArgumentException(
+                        "Input record uses reserved field: "
+                                + SOURCE_ROW_NUMBER);
+            }
+
+            cashRecord.put(SOURCE_ROW_NUMBER, Integer.toString(index + 1));
+
             String rejectionReason = validate(cashRecord, currencies);
 
             if (rejectionReason == null) {
                 validRecords.add(Map.copyOf(cashRecord));
             } else {
-                Map<String, String> rejected = new LinkedHashMap<>(cashRecord);
+                Map<String, String> rejected =
+                        new LinkedHashMap<>(cashRecord);
                 rejected.put("rejectionReason", rejectionReason);
                 rejectedRecords.add(Map.copyOf(rejected));
             }
@@ -89,8 +103,8 @@ public class CashValidator implements StepExecutor {
 
     private String validate(
             Map<String, String> record,
-            Set<String> currencies
-    ) {
+            Set<String> currencies) {
+
         String account = record.get("accountCode");
         String adjustmentId = record.get("adjustmentId");
         String currency = record.get("currency");
@@ -99,6 +113,7 @@ public class CashValidator implements StepExecutor {
         if (account == null || account.isBlank()) {
             return "Missing accountCode";
         }
+
         if (adjustmentId == null || adjustmentId.isBlank()) {
             return "Missing adjustmentId";
         }
@@ -131,8 +146,7 @@ public class CashValidator implements StepExecutor {
             if (!(entry.getKey() instanceof String key)
                     || !(entry.getValue() instanceof String value)) {
                 throw new IllegalArgumentException(
-                        "Record keys and values must be strings"
-                );
+                        "Record keys and values must be strings");
             }
 
             result.put(key, value);
@@ -160,8 +174,7 @@ public class CashValidator implements StepExecutor {
 
         if (currencies.isEmpty()) {
             throw new IllegalArgumentException(
-                    "At least one allowed currency must be configured"
-            );
+                    "At least one allowed currency must be configured");
         }
 
         return Set.copyOf(currencies);
@@ -172,8 +185,7 @@ public class CashValidator implements StepExecutor {
 
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(
-                    "Missing or blank configuration property: " + name
-            );
+                    "Missing or blank configuration property: " + name);
         }
 
         return value;

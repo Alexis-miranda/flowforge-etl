@@ -8,6 +8,7 @@ import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -490,4 +491,47 @@ class CsvExtractorTest {
                 () -> extractor.execute(step, context)
         );
     }
+@Test
+void shouldExtractCsvWithUtf8Bom() throws Exception {
+    Path csvFile = tempDir.resolve("customers-with-bom.csv");
+
+    String csv = "\uFEFFname,city\nAna,Geneva\n";
+
+    Files.writeString(
+            csvFile,
+            csv,
+            StandardCharsets.UTF_8
+    );
+
+    PipelineStep step = new PipelineStep(
+            "extract-customers",
+            "Extract customers",
+            StepType.EXTRACT,
+            1,
+            new StepConfiguration(Map.of(
+                    "path", csvFile.toString(),
+                    "outputKey", "customers",
+                    "requiredHeaders", "name,city"
+            ))
+    );
+
+    PipelineExecutionContext context =
+            new PipelineExecutionContext();
+
+    CsvExtractor extractor = new CsvExtractor();
+
+    extractor.execute(step, context);
+
+    List<?> result = (List<?>) context.get("customers");
+
+    assertEquals(1, result.size());
+
+    assertEquals(
+            Map.of(
+                    "name", "Ana",
+                    "city", "Geneva"
+            ),
+            result.get(0)
+    );
+}
 }
