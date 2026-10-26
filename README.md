@@ -21,9 +21,19 @@
 
 ## About
 
-**FlowForge ETL** is a modular ETL platform built with Java 21 and Apache Maven. It separates the pipeline execution engine from external connectors and provides a shared execution context, sequential step execution, automated tests, and integration with files and external systems.
+**FlowForge ETL** is a personal Java project exploring how to build a modular Extract, Transform, Load (ETL) platform. It separates pipeline execution from external connectors and processes data through configurable steps.
 
-The current implementation includes CSV processing, Cash validation and persistence in SQL Server, FRONT CSV output delivery with recovery of pending publications, and SFTP file transfers.
+The current implementation focuses on a Cash data workflow: reading CSV files, validating and separating accepted and rejected records, persisting results in SQL Server, and tracking the delivery of generated FRONT CSV files. It also includes SFTP file-transfer capabilities with SSH host-key verification.
+
+The project is built with **Java 21**, **Apache Maven**, **JUnit 5**, and **SQL Server**. It is under active development and is not presented as a production-certified system.
+
+### Current verification
+
+- Maven test build: `BUILD SUCCESS`.
+- Latest recorded test run: 177 tests, 0 failures, 0 errors, 6 skipped.
+- End-to-end test report: [ETL-E2E-TEST-2026-10-25.md](docs/ETL-E2E-TEST-2026-10-25.md).
+
+The standard test run includes tests that require external services; skipped tests are not counted as successful integration executions. See the test report for the separately recorded SQL Server end-to-end scenario.
 
 ## Features
 
