@@ -146,15 +146,7 @@ public class CashValidator implements StepExecutor {
     private Map<String, String> toStringMap(Map<?, ?> row) {
         Map<String, String> result = new LinkedHashMap<>();
 
-        for (Map.Entry<?, ?> entry : row.entrySet()) {
-            if (!(entry.getKey() instanceof String key)
-                    || !(entry.getValue() instanceof String value)) {
-                throw new IllegalArgumentException(
-                        "Record keys and values must be strings");
-            }
-
-            result.put(key, value);
-        }
+        RecordMapper.forEachStringEntry(row, result::put);
 
         return result;
     }
