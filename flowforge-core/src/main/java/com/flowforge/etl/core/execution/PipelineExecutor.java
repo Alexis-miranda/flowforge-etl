@@ -6,11 +6,7 @@ import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -51,7 +47,7 @@ public class PipelineExecutor {
 
         PipelineExecution execution = new PipelineExecution(pipeline.id());
         PipelineExecutionContext context = new PipelineExecutionContext();
-        List<StepExecutionRecord> history = new ArrayList<>();
+        StepExecutionHistory history = new StepExecutionHistory();
 
         persistence.persistStart(execution);
         notifyStatus(pipeline.id(), execution.status());
@@ -70,9 +66,7 @@ public class PipelineExecutor {
 
             try {
                 stepExecutor.execute(step, context);
-                history.add(new StepExecutionRecord(
-                        step.id(), step.name(), StepExecutionStatus.SUCCEEDED,
-                        stepStartedAt, Instant.now(), null, null, null, null, null));
+                history.recordSucceeded(step, stepStartedAt);
             } catch (RuntimeException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
@@ -94,45 +88,9 @@ public class PipelineExecutor {
             RuntimeException exception,
             Instant stepStartedAt) {
 
-        String errorMessage = exception.getMessage();
-        if (errorMessage == null || errorMessage.isBlank()) {
-            errorMessage = exception.getClass().getSimpleName();
-        }
-
-        Throwable rootCause = exception;
-        Set<Throwable> visitedCauses =
-                Collections.newSetFromMap(new IdentityHashMap<>());
-        visitedCauses.add(rootCause);
-        while (rootCause.getCause() != null
-                && visitedCauses.add(rootCause.getCause())) {
-            rootCause = rootCause.getCause();
-        }
-
-        FailureClassification failureClassification =
-                exception instanceof StepExecutionFailureException classifiedFailure
-                        ? classifiedFailure.failureClassification()
-                        : FailureClassification.UNCLASSIFIED;
-
-        history.add(new StepExecutionRecord(
-                failedStep.id(),
-                failedStep.name(),
-                StepExecutionStatus.FAILED,
-                stepStartedAt,
-                Instant.now(),
-                exception.getClass().getName(),
-                errorMessage,
-                rootCause == exception ? null : rootCause.getClass().getName(),
-                rootCause == exception ? null : rootCause.getMessage(),
-                null,
-                failureClassification));
-
-        for (int index = failedIndex + 1; index < steps.size(); index++) {
-            PipelineStep skipped = steps.get(index);
-            history.add(new StepExecutionRecord(
-                    skipped.id(), skipped.name(), StepExecutionStatus.SKIPPED,
-                    null, Instant.now(), null, null, null, null,
-                    "Not executed because step '" + failedStep.id() + "' failed"));
-        }
+        String errorMessage = history.recordFailed(
+                failedStep, exception, stepStartedAt);
+        history.recordSkippedAfterFailure(steps, failedIndex, failedStep);
 
         execution.fail();
         notifyStatus(pipelineId, execution.status());
@@ -153,7 +111,7 @@ public class PipelineExecutor {
                 errorMessage,
                 execution.startedAt(),
                 execution.finishedAt(),
-                history);
+                history.records());
     }
 
     /** Notifies the listener without interrupting execution if it fails. */
