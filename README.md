@@ -85,6 +85,30 @@ The `flowforge-core` module provides the engine-independent building blocks used
 
 The `flowforge-cash` module contains Cash-specific validation rules, SQL staging, FRONT CSV serialization and publication, pipeline composition, and command-line entry points. It depends on Core and Connectors; neither generic module depends on Cash.
 
+### Creating a pipeline
+
+A use case builds a `PipelineDefinition` from ordered `PipelineStep` instances and supplies the required `StepExecutor` implementations to `PipelineExecutor`. Core does not discover or instantiate application-specific executors; the application owns that composition.
+
+Each executor declares a `StepType` and may override `connectorKey()` (the default is `default`). When a step type has more than one registered executor, its `StepConfiguration` must include the matching `connector` property. Other configuration properties are interpreted by the selected executor; Core treats them as opaque string key/value pairs.
+
+For example, a step selects an executor without referring to its Java class:
+
+```java
+var step = new PipelineStep(
+    "extract-input",
+    "Extract input",
+    StepType.EXTRACT,
+    1,
+    new StepConfiguration(Map.of(
+        "connector", "default",
+        "path", "input.csv",
+        "outputKey", "records"
+    ))
+);
+```
+
+A new application should define its pipeline and steps, implement or reuse the required executors, register them when constructing `PipelineExecutor`, and provide its own persistence and listener configuration. Keep business rules and the composition root in the application module. Put reusable execution abstractions in Core and technology-specific integrations in Connectors. Applications depend on the generic modules they use; generic modules must not depend on application modules.
+
 ## Cash ETL workflow
 
 The Cash command-line pipeline runs these steps in order:
@@ -241,25 +265,25 @@ Its arguments are:
 - `columns`: optional comma-separated output column names; defaults to `accountCode,currency,amount`.
 - `sourceFile`: optional source-file identifier used for load and delivery tracking.
 
-Build the project first:
+Build Cash and its upstream modules, then generate the runtime dependency classpath:
 
 ```powershell
-mvn -pl flowforge-connectors -am test
+mvn -pl flowforge-cash -am package
+mvn -pl flowforge-connectors dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
 ```
 
-For local command-line execution, build the connector module and create or refresh its dependency classpath as required by the project build. Then run the CLI with the compiled classes and dependency JARs on the Java classpath.
-
-Example invocation (replace paths and values with your local settings):
+Run the CLI from the repository root (replace paths and values with your local settings):
 
 ```powershell
-java -cp "<cash-classes>;<connectors-classes>;<core-classes>;<dependency-jars>" `
-  com.flowforge.etl.cash.cli.CashPipelineCli `
-  ".\input\cash.csv" `
+$deps = (Get-Content .\\flowforge-connectors\\connectors-classpath.txt -Raw).Trim()
+$cp = ".\\flowforge-cash\\target\\classes;.\\flowforge-connectors\\target\\classes;.\\flowforge-core\\target\\classes;$deps"
+java -cp $cp com.flowforge.etl.cash.cli.CashPipelineCli `
+  ".\\input\\cash.csv" `
   "YOUR_BACKOFFICE_CODE" `
-  ".\output"
+  ".\\output"
 ```
 
-The SQL Server environment variables must be set in the same PowerShell session before running the pipeline.
+The SQL Server environment variables must be set in the same PowerShell session before running the pipeline. Regenerate the classpath file after changing runtime dependencies.
 
 ## Recovering pending output deliveries
 
@@ -269,7 +293,14 @@ The recovery entry point is:
 
 `com.flowforge.etl.cash.cli.CashOutputRecoveryCli`
 
-From the repository root, after compiling the modules, run:
+From the repository root, build the modules and generate the dependency classpath (if you have not already done so):
+
+```powershell
+mvn -pl flowforge-cash -am package
+mvn -pl flowforge-connectors dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
+```
+
+Then run:
 
 ```powershell
 $deps = (Get-Content .\flowforge-connectors\connectors-classpath.txt -Raw).Trim()
