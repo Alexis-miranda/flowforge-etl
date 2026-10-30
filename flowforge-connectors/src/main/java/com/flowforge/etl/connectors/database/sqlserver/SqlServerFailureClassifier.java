@@ -45,7 +45,8 @@ final class SqlServerFailureClassifier {
 
             if (errorCode == DEADLOCK_ERROR_CODE
                     || "40001".equals(sqlState)
-                    || (sqlState != null && sqlState.startsWith("08"))) {
+                    || "08S01".equals(sqlState)
+                    || "08006".equals(sqlState)) {
                 retryable = true;
             }
         }
