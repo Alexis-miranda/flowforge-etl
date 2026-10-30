@@ -212,8 +212,19 @@ public class PipelineExecutor {
     }
 
     private void persistStart(PipelineExecution execution) {
-        if (repository != null) {
+        if (repository == null) {
+            return;
+        }
+        try {
             repository.start(toSnapshot(execution, null, null));
+        } catch (RuntimeException exception) {
+            throw new PipelineExecutionPersistenceException(
+                    execution.executionId(),
+                    execution.pipelineId(),
+                    List.of(new PipelineExecutionPersistenceException.Failure(
+                            PipelineExecutionPersistenceException.Operation.START,
+                            exception)),
+                    null);
         }
     }
 
@@ -231,9 +242,21 @@ public class PipelineExecutor {
                 execution.finishedAt());
     }
 
-    /** Saves the final snapshot and result when a repository is configured. */
+    /**
+     * Persists the final snapshot and result independently. A failure in one
+     * operation must not prevent attempting the other operation.
+     *
+     * @throws PipelineExecutionPersistenceException when any persistence
+     *         operation fails; the exception retains the execution result
+     */
     private PipelineExecutionResult saveResult(PipelineExecutionResult result) {
-        if (repository != null) {
+        if (repository == null) {
+            return result;
+        }
+
+        List<PipelineExecutionPersistenceException.Failure> failures =
+                new ArrayList<>();
+        try {
             repository.update(new PipelineExecutionSnapshot(
                     result.executionId(),
                     result.pipelineId(),
@@ -242,7 +265,26 @@ public class PipelineExecutor {
                     result.errorMessage(),
                     result.startedAt(),
                     result.finishedAt()));
+        } catch (RuntimeException exception) {
+            failures.add(new PipelineExecutionPersistenceException.Failure(
+                    PipelineExecutionPersistenceException.Operation.UPDATE,
+                    exception));
+        }
+
+        try {
             repository.save(result);
+        } catch (RuntimeException exception) {
+            failures.add(new PipelineExecutionPersistenceException.Failure(
+                    PipelineExecutionPersistenceException.Operation.SAVE,
+                    exception));
+        }
+
+        if (!failures.isEmpty()) {
+            throw new PipelineExecutionPersistenceException(
+                    result.executionId(),
+                    result.pipelineId(),
+                    failures,
+                    result);
         }
         return result;
     }
