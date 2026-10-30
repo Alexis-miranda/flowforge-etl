@@ -173,6 +173,148 @@ class PipelineExecutionResultTest {
         );
     }
 
+
+    @Test
+    void shouldRejectStartedStepInFinalHistory() {
+        StepExecutionRecord startedStep = new StepExecutionRecord(
+                "extract",
+                "Extract",
+                StepExecutionStatus.STARTED,
+                STARTED_AT,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutionResult(
+                        EXECUTION_ID,
+                        PIPELINE_ID,
+                        PipelineStatus.SUCCEEDED,
+                        null,
+                        null,
+                        STARTED_AT,
+                        FINISHED_AT,
+                        java.util.List.of(startedStep)));
+    }
+
+    @Test
+    void shouldRejectFailedResultWithoutMatchingFailedStepInHistory() {
+        StepExecutionRecord succeededStep = new StepExecutionRecord(
+                "extract",
+                "Extract",
+                StepExecutionStatus.SUCCEEDED,
+                STARTED_AT,
+                FINISHED_AT,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutionResult(
+                        EXECUTION_ID,
+                        PIPELINE_ID,
+                        PipelineStatus.FAILED,
+                        "transform",
+                        "Transformation failed",
+                        STARTED_AT,
+                        FINISHED_AT,
+                        java.util.List.of(succeededStep)));
+    }
+
+    @Test
+    void shouldRejectDuplicateStepIdsInHistory() {
+        StepExecutionRecord first = new StepExecutionRecord(
+                "extract",
+                "Extract",
+                StepExecutionStatus.SUCCEEDED,
+                STARTED_AT,
+                FINISHED_AT,
+                null,
+                null,
+                null,
+                null,
+                null);
+        StepExecutionRecord duplicate = new StepExecutionRecord(
+                "extract",
+                "Extract again",
+                StepExecutionStatus.SUCCEEDED,
+                STARTED_AT,
+                FINISHED_AT,
+                null,
+                null,
+                null,
+                null,
+                null);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutionResult(
+                        EXECUTION_ID,
+                        PIPELINE_ID,
+                        PipelineStatus.SUCCEEDED,
+                        null,
+                        null,
+                        STARTED_AT,
+                        FINISHED_AT,
+                        java.util.List.of(first, duplicate)));
+    }
+
+    @Test
+    void shouldAcceptConsistentFailedStepHistory() {
+        StepExecutionRecord succeededStep = new StepExecutionRecord(
+                "extract",
+                "Extract",
+                StepExecutionStatus.SUCCEEDED,
+                STARTED_AT,
+                FINISHED_AT,
+                null,
+                null,
+                null,
+                null,
+                null);
+        StepExecutionRecord failedStep = new StepExecutionRecord(
+                "transform",
+                "Transform",
+                StepExecutionStatus.FAILED,
+                STARTED_AT,
+                FINISHED_AT,
+                IllegalStateException.class.getName(),
+                "Transformation failed",
+                null,
+                null,
+                null);
+        StepExecutionRecord skippedStep = new StepExecutionRecord(
+                "load",
+                "Load",
+                StepExecutionStatus.SKIPPED,
+                null,
+                FINISHED_AT,
+                null,
+                null,
+                null,
+                null,
+                "Not executed because step 'transform' failed");
+
+        PipelineExecutionResult result = new PipelineExecutionResult(
+                EXECUTION_ID,
+                PIPELINE_ID,
+                PipelineStatus.FAILED,
+                "transform",
+                "Transformation failed",
+                STARTED_AT,
+                FINISHED_AT,
+                java.util.List.of(succeededStep, failedStep, skippedStep));
+
+        assertEquals(3, result.stepHistory().size());
+    }
+
     @Test
     void shouldCalculateExecutionDuration() {
         PipelineExecutionResult result = new PipelineExecutionResult(
