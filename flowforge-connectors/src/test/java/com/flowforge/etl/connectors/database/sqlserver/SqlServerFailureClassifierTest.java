@@ -19,6 +19,15 @@ class SqlServerFailureClassifierTest {
     }
 
     @Test
+    void shouldNotAssumeEveryConnectionStateIsTransient() {
+        SQLException exception =
+                new SQLException("could not establish connection", "08001", 0);
+
+        assertEquals(FailureClassification.UNCLASSIFIED,
+                SqlServerFailureClassifier.classify(exception));
+    }
+
+    @Test
     void shouldClassifyDeadlocksAsRetryable() {
         SQLException exception =
                 new SQLException("deadlock", "40001", 1205);
