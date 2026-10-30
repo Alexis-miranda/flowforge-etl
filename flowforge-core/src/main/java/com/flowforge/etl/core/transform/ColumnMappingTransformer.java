@@ -63,14 +63,7 @@ public class ColumnMappingTransformer implements StepExecutor {
 
             Map<String, String> mappedRow = new LinkedHashMap<>();
 
-            for (Map.Entry<?, ?> entry : row.entrySet()) {
-                if (!(entry.getKey() instanceof String source)
-                        || !(entry.getValue() instanceof String value)) {
-                    throw new IllegalArgumentException(
-                            "Record keys and values must be strings"
-                    );
-                }
-
+            RecordMapper.forEachStringEntry(row, (source, value) -> {
                 String target = mappings.getOrDefault(source, source);
 
                 if (mappedRow.containsKey(target)) {
@@ -81,7 +74,7 @@ public class ColumnMappingTransformer implements StepExecutor {
                 }
 
                 mappedRow.put(target, value);
-            }
+            });
 
             for (String source : mappings.keySet()) {
                 if (!row.containsKey(source)) {
