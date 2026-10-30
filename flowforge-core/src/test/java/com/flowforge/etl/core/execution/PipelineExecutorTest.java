@@ -86,6 +86,37 @@ class PipelineExecutorTest {
         assertNotNull(failedStep.finishedAt());
         assertEquals(IllegalStateException.class.getName(),
                 failedStep.exceptionType());
+        assertEquals(FailureClassification.UNCLASSIFIED,
+                failedStep.failureClassification());
+    }
+
+    @Test
+    void shouldRecordExplicitFailureClassifications() {
+        for (FailureClassification classification : FailureClassification.values()) {
+            StepExecutor failingExecutor = new StepExecutor() {
+                @Override
+                public StepType supportedType() {
+                    return StepType.EXTRACT;
+                }
+
+                @Override
+                public void execute(
+                        PipelineStep step,
+                        PipelineExecutionContext context) {
+                    throw new StepExecutionFailureException(
+                            classification, "Classified failure");
+                }
+            };
+
+            PipelineExecutor executor = new PipelineExecutor(
+                    List.of(failingExecutor));
+            PipelineExecutionResult result = executor.execute(createPipeline(List.of(
+                    createStep("extract", StepType.EXTRACT, 1))));
+
+            assertEquals(PipelineStatus.FAILED, result.status());
+            assertEquals(classification,
+                    result.stepHistory().get(0).failureClassification());
+        }
     }
 
     @Test
