@@ -1,4 +1,4 @@
-package com.flowforge.etl.connectors.file.csv;
+package com.flowforge.etl.cash.delivery;
 
 import org.junit.jupiter.api.Test;
 

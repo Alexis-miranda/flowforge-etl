@@ -1,8 +1,9 @@
 
-package com.flowforge.etl.connectors.cli;
+package com.flowforge.etl.cash.cli;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
-import com.flowforge.etl.connectors.file.csv.CashOutputPublisherLoader;
+import com.flowforge.etl.cash.delivery.CashOutputPublisherLoader;
+
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;
 import com.flowforge.etl.core.domain.StepType;

@@ -1,4 +1,6 @@
-package com.flowforge.etl.core.transform;
+package com.flowforge.etl.cash.validation;
+
+import com.flowforge.etl.core.transform.RecordMapper;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;

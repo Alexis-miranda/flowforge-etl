@@ -1,4 +1,4 @@
-package com.flowforge.etl.connectors.file.csv;
+package com.flowforge.etl.cash.delivery;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;

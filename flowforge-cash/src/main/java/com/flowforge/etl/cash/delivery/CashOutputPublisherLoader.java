@@ -1,4 +1,4 @@
-package com.flowforge.etl.connectors.file.csv;
+package com.flowforge.etl.cash.delivery;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
 import com.flowforge.etl.core.domain.PipelineStep;

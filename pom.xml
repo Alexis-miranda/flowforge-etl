@@ -16,6 +16,7 @@
     <modules>
         <module>flowforge-core</module>
 	<module>flowforge-connectors</module>
+        <module>flowforge-cash</module>
     </modules>
 
     <properties>

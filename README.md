@@ -55,8 +55,9 @@ FlowForge ETL is a Maven multi-module project.
 
 | Module | Responsibility |
 | --- | --- |
-| `flowforge-core` | Pipeline domain model, execution engine, shared context, validation and transformations |
-| `flowforge-connectors` | CSV, SQL Server and SFTP connectors, pipeline wiring and command-line entry points |
+| `flowforge-core` | Pipeline domain model, execution engine, shared context and generic transformations |
+| `flowforge-connectors` | Reusable CSV, SQL Server infrastructure and SFTP connectors |
+| `flowforge-cash` | Cash validation, persistence, FRONT delivery, pipeline composition and CLI |
 
 ### Core module
 
@@ -67,7 +68,7 @@ The `flowforge-core` module provides the engine-independent building blocks used
 | `domain` | Pipeline definitions, steps, configurations and execution statuses |
 | `execution` | Pipeline execution, shared context, results and listeners |
 | `extract` | Extraction abstractions |
-| `transform` | Validation and transformation logic |
+| `transform` | Generic transformation logic |
 | `load` | Loading abstractions |
 
 ### Connectors module
@@ -75,7 +76,7 @@ The `flowforge-core` module provides the engine-independent building blocks used
 | Connector | Current capability |
 | --- | --- |
 | CSV | Read, serialize and write CSV files |
-| SQL Server | Persist Cash staging, rejected records, master records, load control and output delivery state |
+| SQL Server | Generic SQL Server connection and pipeline-execution audit repository |
 | SFTP | Upload and download files with SSH host-key verification |
 | RabbitMQ | Planned; implementation pending |
 | IBM MQ | Planned; implementation pending |

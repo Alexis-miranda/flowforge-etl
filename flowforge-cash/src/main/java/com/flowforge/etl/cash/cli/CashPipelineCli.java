@@ -1,6 +1,7 @@
-package com.flowforge.etl.connectors.cli;
+package com.flowforge.etl.cash.cli;
 
-import com.flowforge.etl.connectors.integration.PipelineExecutorFactory;
+import com.flowforge.etl.cash.execution.PipelineExecutorFactory;
+
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;

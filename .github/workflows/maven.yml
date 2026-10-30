@@ -29,4 +29,4 @@ jobs:
           cache: maven
 
       - name: Run Maven tests
-        run: mvn --batch-mode --no-transfer-progress -pl flowforge-connectors -am test
+        run: mvn --batch-mode --no-transfer-progress -pl flowforge-cash -am test

@@ -3,12 +3,12 @@ package com.flowforge.etl.core.transform;
 import java.util.Map;
 import java.util.function.BiConsumer;
 
-final class RecordMapper {
+public final class RecordMapper {
 
     private RecordMapper() {
     }
 
-    static void forEachStringEntry(
+    public static void forEachStringEntry(
             Map<?, ?> record,
             BiConsumer<String, String> consumer
     ) {

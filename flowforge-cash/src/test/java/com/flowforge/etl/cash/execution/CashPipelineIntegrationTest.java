@@ -1,4 +1,6 @@
-package com.flowforge.etl.connectors.integration;
+package com.flowforge.etl.cash.execution;
+
+import com.flowforge.etl.cash.validation.CashValidator;
 
 
 import com.flowforge.etl.connectors.file.csv.CsvExtractor;
@@ -13,7 +15,6 @@ import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import com.flowforge.etl.core.execution.StepExecutor;
 
-import com.flowforge.etl.core.transform.CashValidator;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;

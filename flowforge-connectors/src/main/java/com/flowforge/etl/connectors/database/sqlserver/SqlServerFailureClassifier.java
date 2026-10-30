@@ -12,7 +12,7 @@ import java.util.Set;
  *
  * <p>Unknown failures remain unclassified. This class does not perform retries.</p>
  */
-final class SqlServerFailureClassifier {
+public final class SqlServerFailureClassifier {
 
     private static final int DEADLOCK_ERROR_CODE = 1205;
     private static final int DUPLICATE_INDEX_ERROR_CODE = 2601;
@@ -21,7 +21,7 @@ final class SqlServerFailureClassifier {
     private SqlServerFailureClassifier() {
     }
 
-    static FailureClassification classify(SQLException exception) {
+    public static FailureClassification classify(SQLException exception) {
         if (exception == null) {
             return FailureClassification.UNCLASSIFIED;
         }

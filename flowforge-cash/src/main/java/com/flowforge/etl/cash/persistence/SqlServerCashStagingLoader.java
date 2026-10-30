@@ -1,4 +1,7 @@
-package com.flowforge.etl.connectors.database.sqlserver;
+package com.flowforge.etl.cash.persistence;
+
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerFailureClassifier;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;

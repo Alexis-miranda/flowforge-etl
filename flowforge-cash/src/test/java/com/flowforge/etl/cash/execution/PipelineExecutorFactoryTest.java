@@ -1,4 +1,4 @@
-package com.flowforge.etl.connectors.integration;
+package com.flowforge.etl.cash.execution;
 
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import org.junit.jupiter.api.Test;
