@@ -77,12 +77,13 @@ public record PipelineExecutionResult(
         }
 
         stepHistory = List.copyOf(stepHistory);
-        validateStepHistory(status, failedStepId, stepHistory);
+        validateStepHistory(status, failedStepId, errorMessage, stepHistory);
     }
 
     private static void validateStepHistory(
             PipelineStatus pipelineStatus,
             String failedStepId,
+            String errorMessage,
             List<StepExecutionRecord> stepHistory) {
 
         // An empty history is allowed for results created through the legacy constructor.
