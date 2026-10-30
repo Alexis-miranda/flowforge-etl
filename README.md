@@ -81,6 +81,10 @@ The `flowforge-core` module provides the engine-independent building blocks used
 | RabbitMQ | Planned; implementation pending |
 | IBM MQ | Planned; implementation pending |
 
+### Cash module
+
+The `flowforge-cash` module contains Cash-specific validation rules, SQL staging, FRONT CSV serialization and publication, pipeline composition, and command-line entry points. It depends on Core and Connectors; neither generic module depends on Cash.
+
 ## Cash ETL workflow
 
 The Cash command-line pipeline runs these steps in order:
@@ -175,10 +179,10 @@ Validate the Maven project:
 mvn validate
 ```
 
-Run the connector module tests and required upstream modules:
+Run the Cash module tests and required upstream modules:
 
 ```powershell
-mvn -pl flowforge-connectors -am test
+mvn -pl flowforge-cash -am test
 ```
 
 Build and verify all modules:
@@ -223,7 +227,7 @@ Do not disable host-key verification to work around connection errors.
 
 The CLI class is:
 
-`com.flowforge.etl.connectors.cli.CashPipelineCli`
+`com.flowforge.etl.cash.cli.CashPipelineCli`
 
 Its arguments are:
 
@@ -248,8 +252,8 @@ For local command-line execution, build the connector module and create or refre
 Example invocation (replace paths and values with your local settings):
 
 ```powershell
-java -cp "<connector-classes>;<core-classes>;<dependency-jars>" `
-  com.flowforge.etl.connectors.cli.CashPipelineCli `
+java -cp "<cash-classes>;<connectors-classes>;<core-classes>;<dependency-jars>" `
+  com.flowforge.etl.cash.cli.CashPipelineCli `
   ".\input\cash.csv" `
   "YOUR_BACKOFFICE_CODE" `
   ".\output"
@@ -263,14 +267,14 @@ If SQL Server contains deliveries in `PENDING` state because publication failed,
 
 The recovery entry point is:
 
-`com.flowforge.etl.connectors.cli.CashOutputRecoveryCli`
+`com.flowforge.etl.cash.cli.CashOutputRecoveryCli`
 
 From the repository root, after compiling the modules, run:
 
 ```powershell
 $deps = (Get-Content .\flowforge-connectors\connectors-classpath.txt -Raw).Trim()
-$cp = ".\flowforge-connectors\target\classes;.\flowforge-core\target\classes;$deps"
-java -cp $cp com.flowforge.etl.connectors.cli.CashOutputRecoveryCli
+$cp = ".\flowforge-cash\target\classes;.\flowforge-connectors\target\classes;.\flowforge-core\target\classes;$deps"
+java -cp $cp com.flowforge.etl.cash.cli.CashOutputRecoveryCli
 ```
 
 The dependency classpath file must exist and contain the dependency JAR paths for the local build. The recovery command finds pending deliveries, verifies payload integrity, attempts publication and updates delivery status. It does not execute the extraction, validation or Cash persistence stages.
@@ -315,14 +319,10 @@ flowforge-etl/
 │       └── test/java/
 ├── flowforge-connectors/
 │   ├── pom.xml
-│   └── src/
-│       ├── main/java/com/flowforge/etl/connectors/
-│       │   ├── cli/
-│       │   ├── file/csv/
-│       │   ├── database/sqlserver/
-│       │   ├── integration/
-│       │   └── sftp/
-│       └── test/java/
+│   └── src/ (generic CSV, SQL Server and SFTP connectors)
+├── flowforge-cash/
+│   ├── pom.xml
+│   └── src/ (Cash CLI, execution, validation, persistence and delivery)
 └── docs/
     ├── images/
     └── sql/
