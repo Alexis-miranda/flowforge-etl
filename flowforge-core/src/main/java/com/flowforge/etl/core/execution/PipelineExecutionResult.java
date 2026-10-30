@@ -124,6 +124,10 @@ public record PipelineExecutionResult(
             throw new IllegalArgumentException(
                     "Failed execution history must identify its failed step");
         }
+        if (!stepHistory.get(failedIndex).errorMessage().equals(errorMessage)) {
+            throw new IllegalArgumentException(
+                    "Pipeline error message must match the failed step error message");
+        }
 
         for (int index = 0; index < failedIndex; index++) {
             if (stepHistory.get(index).status() != StepExecutionStatus.SUCCEEDED) {
