@@ -8,12 +8,13 @@ import java.time.Instant;
  * @param stepId step identifier
  * @param stepName human-readable step name
  * @param status step lifecycle status
- * @param startedAt step start time; null when the step was skipped
+ * @param startedAt step start time; null when skipped
  * @param finishedAt step finish time; null only while started
  * @param exceptionType fully qualified exception type, when available
  * @param errorMessage failure message, when available
  * @param causeType fully qualified root cause type, when available
  * @param causeMessage root cause message, when available
+ * @param skipReason explanation for a skipped step, when applicable
  */
 public record StepExecutionRecord(
         String stepId,
@@ -24,7 +25,8 @@ public record StepExecutionRecord(
         String exceptionType,
         String errorMessage,
         String causeType,
-        String causeMessage) {
+        String causeMessage,
+        String skipReason) {
 
     public StepExecutionRecord {
         if (stepId == null || stepId.isBlank()) {
@@ -65,6 +67,15 @@ public record StepExecutionRecord(
                 || causeType != null || causeMessage != null)) {
             throw new IllegalArgumentException(
                     "Only failed steps may contain exception details");
+        }
+        if (status == StepExecutionStatus.SKIPPED
+                && (skipReason == null || skipReason.isBlank())) {
+            throw new IllegalArgumentException(
+                    "Skipped steps must include a reason");
+        }
+        if (status != StepExecutionStatus.SKIPPED && skipReason != null) {
+            throw new IllegalArgumentException(
+                    "Only skipped steps may include a skip reason");
         }
     }
 }
