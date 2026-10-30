@@ -888,6 +888,9 @@ class PipelineExecutorTest {
                 skipped.skipReason());
         assertNull(skipped.startedAt());
         assertNotNull(skipped.finishedAt());
+        assertEquals(
+                "Not executed because step 'transform' failed",
+                skipped.skipReason());
     }
 
     @Test
@@ -906,6 +909,40 @@ class PipelineExecutorTest {
         assertEquals(2, result.stepHistory().size());
         assertTrue(result.stepHistory().stream()
                 .allMatch(record -> record.status() == StepExecutionStatus.SUCCEEDED));
+    }
+
+    @Test
+    void shouldPersistStepHistoryInExecutionRepository() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.TRANSFORM;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                throw new IllegalArgumentException("Invalid transformation");
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor), null, repository);
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("transform", StepType.TRANSFORM, 1),
+                createStep("load", StepType.LOAD, 2)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+        PipelineExecutionResult persisted = repository
+                .findByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(result.stepHistory(), persisted.stepHistory());
+        assertEquals(StepExecutionStatus.FAILED, persisted.stepHistory().get(0).status());
+        assertEquals(StepExecutionStatus.SKIPPED, persisted.stepHistory().get(1).status());
     }
 
     private StepExecutor createExecutorWithConnector(
