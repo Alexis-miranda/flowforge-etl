@@ -97,15 +97,15 @@ public class PipelineExecutor {
         List<PipelineStep> steps = pipeline.steps();
         for (int index = 0; index < steps.size(); index++) {
             PipelineStep step = steps.get(index);
+            Instant stepStartedAt = Instant.now();
             StepExecutor stepExecutor;
             try {
                 stepExecutor = resolveExecutor(step);
             } catch (IllegalStateException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
-                        steps, history, exception, Instant.now());
+                        steps, history, exception, stepStartedAt);
             }
 
-            Instant stepStartedAt = Instant.now();
             try {
                 stepExecutor.execute(step, context);
                 history.add(new StepExecutionRecord(
