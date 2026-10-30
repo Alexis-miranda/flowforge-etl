@@ -4,6 +4,7 @@ import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import com.flowforge.etl.core.execution.StepExecutor;
+import com.flowforge.etl.core.execution.StepExecutionFailureException;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -184,7 +185,9 @@ public class SqlServerCashStagingLoader implements StepExecutor {
 
                 if (exception instanceof SQLException sqlException
                         && isUniqueViolation(sqlException)) {
-                    throw new IllegalStateException(
+                    throw new StepExecutionFailureException(
+                            com.flowforge.etl.core.execution.FailureClassification
+                                    .REQUIRES_HUMAN_INTERVENTION,
                             "Cash file has already been loaded: " + sourceFile,
                             exception);
                 }
@@ -193,7 +196,8 @@ public class SqlServerCashStagingLoader implements StepExecutor {
             }
 
         } catch (SQLException exception) {
-            throw new IllegalStateException(
+            throw new StepExecutionFailureException(
+                    SqlServerFailureClassifier.classify(exception),
                     "Failed to load cash records into SQL Server",
                     exception);
         }
@@ -441,8 +445,12 @@ public class SqlServerCashStagingLoader implements StepExecutor {
     }
 
     private boolean isUniqueViolation(SQLException exception) {
+        java.util.Set<SQLException> visited =
+                java.util.Collections.newSetFromMap(
+                        new java.util.IdentityHashMap<>());
+
         for (SQLException current = exception;
-             current != null;
+             current != null && visited.add(current);
              current = current.getNextException()) {
             if (current.getErrorCode() == 2601
                     || current.getErrorCode() == 2627) {
