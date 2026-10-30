@@ -831,6 +831,80 @@ class PipelineExecutorTest {
 
 
 
+    @Test
+    void shouldRecordSuccessfulFailedAndSkippedStepsWithCause() {
+        List<String> executedSteps = new ArrayList<>();
+        StepExecutor extract = createExecutor(StepType.EXTRACT, executedSteps);
+        StepExecutor failingTransform = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.TRANSFORM;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                executedSteps.add(step.id());
+                throw new IllegalStateException(
+                        "Transformation failed",
+                        new IllegalArgumentException("Invalid input data"));
+            }
+        };
+        StepExecutor load = createExecutor(StepType.LOAD, executedSteps);
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(extract, failingTransform, load));
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1),
+                createStep("transform", StepType.TRANSFORM, 2),
+                createStep("load", StepType.LOAD, 3)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals(List.of("extract", "transform"), executedSteps);
+        assertEquals(3, result.stepHistory().size());
+
+        StepExecutionRecord first = result.stepHistory().get(0);
+        assertEquals("extract", first.stepId());
+        assertEquals(StepExecutionStatus.SUCCEEDED, first.status());
+        assertNotNull(first.startedAt());
+        assertNotNull(first.finishedAt());
+
+        StepExecutionRecord failed = result.stepHistory().get(1);
+        assertEquals("transform", failed.stepId());
+        assertEquals(StepExecutionStatus.FAILED, failed.status());
+        assertEquals(IllegalStateException.class.getName(), failed.exceptionType());
+        assertEquals("Transformation failed", failed.errorMessage());
+        assertEquals(IllegalArgumentException.class.getName(), failed.causeType());
+        assertEquals("Invalid input data", failed.causeMessage());
+
+        StepExecutionRecord skipped = result.stepHistory().get(2);
+        assertEquals("load", skipped.stepId());
+        assertEquals(StepExecutionStatus.SKIPPED, skipped.status());
+        assertNull(skipped.startedAt());
+        assertNotNull(skipped.finishedAt());
+    }
+
+    @Test
+    void shouldReturnStepHistoryForSuccessfulPipeline() {
+        List<String> executedSteps = new ArrayList<>();
+        PipelineExecutor executor = new PipelineExecutor(List.of(
+                createExecutor(StepType.EXTRACT, executedSteps),
+                createExecutor(StepType.LOAD, executedSteps)));
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1),
+                createStep("load", StepType.LOAD, 2)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(2, result.stepHistory().size());
+        assertTrue(result.stepHistory().stream()
+                .allMatch(record -> record.status() == StepExecutionStatus.SUCCEEDED));
+    }
+
     private StepExecutor createExecutorWithConnector(
             StepType type,
             String connector,
