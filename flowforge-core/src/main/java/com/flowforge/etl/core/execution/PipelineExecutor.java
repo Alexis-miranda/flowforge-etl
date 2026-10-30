@@ -3,6 +3,7 @@ package com.flowforge.etl.core.execution;
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
+import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
 import java.util.ArrayList;
