@@ -2,6 +2,7 @@ package com.flowforge.etl.connectors.database.sqlserver;
 
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
+import com.flowforge.etl.core.execution.FailureClassification;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import com.flowforge.etl.core.execution.StepExecutor;
 import com.flowforge.etl.core.execution.StepExecutionFailureException;
@@ -186,8 +187,7 @@ public class SqlServerCashStagingLoader implements StepExecutor {
                 if (exception instanceof SQLException sqlException
                         && isUniqueViolation(sqlException)) {
                     throw new StepExecutionFailureException(
-                            com.flowforge.etl.core.execution.FailureClassification
-                                    .REQUIRES_HUMAN_INTERVENTION,
+                            FailureClassification.REQUIRES_HUMAN_INTERVENTION,
                             "Cash file has already been loaded: " + sourceFile,
                             exception);
                 }
