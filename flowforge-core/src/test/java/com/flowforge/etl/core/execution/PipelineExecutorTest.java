@@ -883,6 +883,9 @@ class PipelineExecutorTest {
         StepExecutionRecord skipped = result.stepHistory().get(2);
         assertEquals("load", skipped.stepId());
         assertEquals(StepExecutionStatus.SKIPPED, skipped.status());
+        assertEquals(
+                "Not executed because step 'transform' failed",
+                skipped.skipReason());
         assertNull(skipped.startedAt());
         assertNotNull(skipped.finishedAt());
     }
