@@ -4,10 +4,12 @@ import com.flowforge.etl.core.domain.PipelineStatus;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
- * Represents the result of a pipeline execution.
+ * Represents the final result of a pipeline execution.
  *
  * @param executionId unique identifier of the execution
  * @param pipelineId identifier of the executed pipeline
@@ -16,7 +18,7 @@ import java.util.List;
  * @param errorMessage failure message, if any
  * @param startedAt execution start timestamp
  * @param finishedAt execution completion timestamp
- * @param stepHistory ordered diagnostic history of pipeline steps
+ * @param stepHistory ordered final diagnostic history of pipeline steps
  */
 public record PipelineExecutionResult(
         String executionId,
@@ -73,7 +75,68 @@ public record PipelineExecutionResult(
             throw new IllegalArgumentException(
                     "Successful executions must not contain failure details");
         }
+
         stepHistory = List.copyOf(stepHistory);
+        validateStepHistory(status, failedStepId, stepHistory);
+    }
+
+    private static void validateStepHistory(
+            PipelineStatus pipelineStatus,
+            String failedStepId,
+            List<StepExecutionRecord> stepHistory) {
+
+        // An empty history is allowed for results created through the legacy constructor.
+        if (stepHistory.isEmpty()) {
+            return;
+        }
+
+        Set<String> stepIds = new HashSet<>();
+        int failedIndex = -1;
+
+        for (int index = 0; index < stepHistory.size(); index++) {
+            StepExecutionRecord record = stepHistory.get(index);
+            if (!stepIds.add(record.stepId())) {
+                throw new IllegalArgumentException(
+                        "Step history must not contain duplicate step IDs: "
+                                + record.stepId());
+            }
+
+            if (record.status() == StepExecutionStatus.FAILED) {
+                if (failedIndex >= 0) {
+                    throw new IllegalArgumentException(
+                            "Sequential pipeline history must contain at most one failed step");
+                }
+                failedIndex = index;
+            }
+        }
+
+        if (pipelineStatus == PipelineStatus.SUCCEEDED) {
+            if (failedIndex >= 0 || stepHistory.stream().anyMatch(
+                    record -> record.status() != StepExecutionStatus.SUCCEEDED)) {
+                throw new IllegalArgumentException(
+                        "Successful executions may only contain succeeded steps");
+            }
+            return;
+        }
+
+        if (failedIndex < 0
+                || !stepHistory.get(failedIndex).stepId().equals(failedStepId)) {
+            throw new IllegalArgumentException(
+                    "Failed execution history must identify its failed step");
+        }
+
+        for (int index = 0; index < failedIndex; index++) {
+            if (stepHistory.get(index).status() != StepExecutionStatus.SUCCEEDED) {
+                throw new IllegalArgumentException(
+                        "Steps before the failed step must have succeeded");
+            }
+        }
+        for (int index = failedIndex + 1; index < stepHistory.size(); index++) {
+            if (stepHistory.get(index).status() != StepExecutionStatus.SKIPPED) {
+                throw new IllegalArgumentException(
+                        "Steps after the failed step must be skipped");
+            }
+        }
     }
 
     public boolean succeeded() {
