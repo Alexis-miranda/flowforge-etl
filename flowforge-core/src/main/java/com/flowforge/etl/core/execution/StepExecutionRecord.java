@@ -15,6 +15,7 @@ import java.time.Instant;
  * @param causeType fully qualified root cause type, when available
  * @param causeMessage root cause message, when available
  * @param skipReason explanation for a skipped step, when applicable
+ * @param failureClassification operational classification of a failed step
  */
 public record StepExecutionRecord(
         String stepId,
@@ -26,7 +27,29 @@ public record StepExecutionRecord(
         String errorMessage,
         String causeType,
         String causeMessage,
-        String skipReason) {
+        String skipReason,
+        FailureClassification failureClassification) {
+
+    /**
+     * Retains source compatibility with the original diagnostic record.
+     * Older failed records are classified conservatively as unclassified.
+     */
+    public StepExecutionRecord(
+            String stepId,
+            String stepName,
+            StepExecutionStatus status,
+            Instant startedAt,
+            Instant finishedAt,
+            String exceptionType,
+            String errorMessage,
+            String causeType,
+            String causeMessage,
+            String skipReason) {
+        this(stepId, stepName, status, startedAt, finishedAt,
+                exceptionType, errorMessage, causeType, causeMessage, skipReason,
+                status == StepExecutionStatus.FAILED
+                        ? FailureClassification.UNCLASSIFIED : null);
+    }
 
     public StepExecutionRecord {
         if (stepId == null || stepId.isBlank()) {
@@ -54,6 +77,14 @@ public record StepExecutionRecord(
                 && (errorMessage == null || errorMessage.isBlank())) {
             throw new IllegalArgumentException(
                     "Failed steps must include an error message");
+        }
+        if (status == StepExecutionStatus.FAILED && failureClassification == null) {
+            throw new IllegalArgumentException(
+                    "Failed steps must include a failure classification");
+        }
+        if (status != StepExecutionStatus.FAILED && failureClassification != null) {
+            throw new IllegalArgumentException(
+                    "Only failed steps may include a failure classification");
         }
         if (status != StepExecutionStatus.FAILED
                 && (exceptionType != null || errorMessage != null
