@@ -79,6 +79,13 @@ class PipelineExecutorTest {
                 "No executor registered for step type: EXTRACT",
                 result.errorMessage()
         );
+        assertEquals(1, result.stepHistory().size());
+        StepExecutionRecord failedStep = result.stepHistory().get(0);
+        assertEquals(StepExecutionStatus.FAILED, failedStep.status());
+        assertNotNull(failedStep.startedAt());
+        assertNotNull(failedStep.finishedAt());
+        assertEquals(IllegalStateException.class.getName(),
+                failedStep.exceptionType());
     }
 
     @Test
