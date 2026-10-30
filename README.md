@@ -269,7 +269,7 @@ Build Cash and its upstream modules, then generate the runtime dependency classp
 
 ```powershell
 mvn -pl flowforge-cash -am package
-mvn -pl flowforge-connectors dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
+mvn -pl flowforge-connectors -am dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
 ```
 
 Run the CLI from the repository root (replace paths and values with your local settings):
@@ -297,7 +297,7 @@ From the repository root, build the modules and generate the dependency classpat
 
 ```powershell
 mvn -pl flowforge-cash -am package
-mvn -pl flowforge-connectors dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
+mvn -pl flowforge-connectors -am dependency:build-classpath -Dmdep.outputFile=connectors-classpath.txt
 ```
 
 Then run:
