@@ -8,9 +8,12 @@ import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -160,7 +163,11 @@ public class PipelineExecutor {
         }
 
         Throwable rootCause = exception;
-        while (rootCause.getCause() != null && rootCause.getCause() != rootCause) {
+        Set<Throwable> visitedCauses =
+                Collections.newSetFromMap(new IdentityHashMap<>());
+        visitedCauses.add(rootCause);
+        while (rootCause.getCause() != null
+                && visitedCauses.add(rootCause.getCause())) {
             rootCause = rootCause.getCause();
         }
 
