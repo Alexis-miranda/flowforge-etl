@@ -1,8 +1,7 @@
 package com.flowforge.etl.core.execution;
 
-/** Lifecycle status of an individual pipeline step. */
+/** Final status of a step in a completed pipeline execution. */
 public enum StepExecutionStatus {
-    STARTED,
     SUCCEEDED,
     FAILED,
     SKIPPED
