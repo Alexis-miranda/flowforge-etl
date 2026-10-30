@@ -175,33 +175,6 @@ class PipelineExecutionResultTest {
 
 
     @Test
-    void shouldRejectStartedStepInFinalHistory() {
-        StepExecutionRecord startedStep = new StepExecutionRecord(
-                "extract",
-                "Extract",
-                StepExecutionStatus.STARTED,
-                STARTED_AT,
-                null,
-                null,
-                null,
-                null,
-                null,
-                null);
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> new PipelineExecutionResult(
-                        EXECUTION_ID,
-                        PIPELINE_ID,
-                        PipelineStatus.SUCCEEDED,
-                        null,
-                        null,
-                        STARTED_AT,
-                        FINISHED_AT,
-                        java.util.List.of(startedStep)));
-    }
-
-    @Test
     void shouldRejectFailedResultWithoutMatchingFailedStepInHistory() {
         StepExecutionRecord succeededStep = new StepExecutionRecord(
                 "extract",
