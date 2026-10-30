@@ -171,6 +171,11 @@ public class PipelineExecutor {
             rootCause = rootCause.getCause();
         }
 
+        FailureClassification failureClassification =
+                exception instanceof StepExecutionFailureException classifiedFailure
+                        ? classifiedFailure.failureClassification()
+                        : FailureClassification.UNCLASSIFIED;
+
         history.add(new StepExecutionRecord(
                 failedStep.id(),
                 failedStep.name(),
@@ -180,7 +185,9 @@ public class PipelineExecutor {
                 exception.getClass().getName(),
                 errorMessage,
                 rootCause == exception ? null : rootCause.getClass().getName(),
-                rootCause == exception ? null : rootCause.getMessage(), null));
+                rootCause == exception ? null : rootCause.getMessage(),
+                null,
+                failureClassification));
 
         for (int index = failedIndex + 1; index < steps.size(); index++) {
             PipelineStep skipped = steps.get(index);
