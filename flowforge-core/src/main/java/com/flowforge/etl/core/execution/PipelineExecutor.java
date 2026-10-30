@@ -84,7 +84,7 @@ public class PipelineExecutor {
             PipelineStep failedStep,
             int failedIndex,
             List<PipelineStep> steps,
-            List<StepExecutionRecord> history,
+            StepExecutionHistory history,
             RuntimeException exception,
             Instant stepStartedAt) {
 
@@ -102,7 +102,7 @@ public class PipelineExecutor {
             PipelineExecution execution,
             String failedStepId,
             String errorMessage,
-            List<StepExecutionRecord> history) {
+            StepExecutionHistory history) {
         return new PipelineExecutionResult(
                 execution.executionId(),
                 execution.pipelineId(),
