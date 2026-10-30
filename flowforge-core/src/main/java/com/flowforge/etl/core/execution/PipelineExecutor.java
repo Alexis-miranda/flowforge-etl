@@ -3,16 +3,13 @@ package com.flowforge.etl.core.execution;
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
-import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,9 +19,8 @@ public class PipelineExecutor {
 
     private static final Logger LOGGER =
             Logger.getLogger(PipelineExecutor.class.getName());
-    private static final String CONNECTOR_PROPERTY = "connector";
 
-    private final Map<StepType, Map<String, StepExecutor>> executors;
+    private final StepExecutorRegistry executorRegistry;
     private final PipelineExecutionListener listener;
     private final PipelineExecutionRepository repository;
 
@@ -42,41 +38,7 @@ public class PipelineExecutor {
             List<StepExecutor> stepExecutors,
             PipelineExecutionListener listener,
             PipelineExecutionRepository repository) {
-
-        if (stepExecutors == null) {
-            throw new IllegalArgumentException("Step executors must not be null");
-        }
-
-        Map<StepType, Map<String, StepExecutor>> executorMap = new HashMap<>();
-        for (StepExecutor executor : stepExecutors) {
-            if (executor == null) {
-                throw new IllegalArgumentException(
-                        "Step executors must not contain null elements");
-            }
-            StepType type = executor.supportedType();
-            if (type == null) {
-                throw new IllegalArgumentException(
-                        "Executor supported type must not be null");
-            }
-            String connectorKey = executor.connectorKey();
-            if (connectorKey == null || connectorKey.isBlank()) {
-                throw new IllegalArgumentException(
-                        "Executor connector key must not be blank");
-            }
-            Map<String, StepExecutor> connectors =
-                    executorMap.computeIfAbsent(type, ignored -> new HashMap<>());
-            if (connectors.containsKey(connectorKey)) {
-                throw new IllegalArgumentException(
-                        "Duplicate executor for step type " + type
-                                + " and connector: " + connectorKey);
-            }
-            connectors.put(connectorKey, executor);
-        }
-
-        Map<StepType, Map<String, StepExecutor>> immutableMap = new HashMap<>();
-        executorMap.forEach(
-                (type, connectors) -> immutableMap.put(type, Map.copyOf(connectors)));
-        this.executors = Map.copyOf(immutableMap);
+        this.executorRegistry = new StepExecutorRegistry(stepExecutors);
         this.listener = listener;
         this.repository = repository;
     }
@@ -100,7 +62,7 @@ public class PipelineExecutor {
             Instant stepStartedAt = Instant.now();
             StepExecutor stepExecutor;
             try {
-                stepExecutor = resolveExecutor(step);
+                stepExecutor = executorRegistry.resolve(step);
             } catch (IllegalStateException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
@@ -120,31 +82,6 @@ public class PipelineExecutor {
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
         return saveResult(toResult(execution, null, null, history));
-    }
-
-    private StepExecutor resolveExecutor(PipelineStep step) {
-        Map<String, StepExecutor> connectors = executors.get(step.type());
-        if (connectors == null || connectors.isEmpty()) {
-            throw new IllegalStateException(
-                    "No executor registered for step type: " + step.type());
-        }
-
-        String connectorKey = step.configuration().get(CONNECTOR_PROPERTY);
-        if (connectorKey != null && !connectorKey.isBlank()) {
-            StepExecutor executor = connectors.get(connectorKey);
-            if (executor == null) {
-                throw new IllegalStateException(
-                        "No executor registered for step type " + step.type()
-                                + " and connector: " + connectorKey);
-            }
-            return executor;
-        }
-        if (connectors.size() == 1) {
-            return connectors.values().iterator().next();
-        }
-        throw new IllegalStateException(
-                "Multiple executors are registered for step type " + step.type()
-                        + ". Specify the '" + CONNECTOR_PROPERTY + "' property.");
     }
 
     private PipelineExecutionResult failExecution(
