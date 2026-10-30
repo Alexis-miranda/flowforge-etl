@@ -1,6 +1,9 @@
 package com.flowforge.etl.core.execution;
 
+import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
+
+import java.time.Instant;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -84,11 +87,11 @@ final class PipelineExecutionPersistence {
     private PipelineExecutionSnapshot toSnapshot(
             String executionId,
             String pipelineId,
-            com.flowforge.etl.core.domain.PipelineStatus status,
+            PipelineStatus status,
             String failedStepId,
             String errorMessage,
-            java.time.Instant startedAt,
-            java.time.Instant finishedAt) {
+            Instant startedAt,
+            Instant finishedAt) {
         return new PipelineExecutionSnapshot(
                 executionId,
                 pipelineId,
