@@ -107,7 +107,7 @@ public class PipelineExecutor {
                 stepExecutor.execute(step, context);
                 history.add(new StepExecutionRecord(
                         step.id(), step.name(), StepExecutionStatus.SUCCEEDED,
-                        stepStartedAt, Instant.now(), null, null, null, null));
+                        stepStartedAt, Instant.now(), null, null, null, null, null));
             } catch (RuntimeException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
@@ -173,13 +173,14 @@ public class PipelineExecutor {
                 exception.getClass().getName(),
                 errorMessage,
                 rootCause == exception ? null : rootCause.getClass().getName(),
-                rootCause == exception ? null : rootCause.getMessage()));
+                rootCause == exception ? null : rootCause.getMessage(), null));
 
         for (int index = failedIndex + 1; index < steps.size(); index++) {
             PipelineStep skipped = steps.get(index);
             history.add(new StepExecutionRecord(
                     skipped.id(), skipped.name(), StepExecutionStatus.SKIPPED,
-                    null, Instant.now(), null, null, null, null));
+                    null, Instant.now(), null, null, null, null,
+                    "Not executed because step '" + failedStep.id() + "' failed"));
         }
 
         execution.fail();
