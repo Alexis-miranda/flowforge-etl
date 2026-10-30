@@ -4,7 +4,6 @@ import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,6 +18,9 @@ final class PipelineExecutionPersistence {
         this.repository = repository;
     }
 
+    /**
+     * Records the initial running snapshot before any pipeline step executes.
+     */
     void persistStart(PipelineExecution execution) {
         if (repository == null) {
             return;
@@ -44,6 +46,11 @@ final class PipelineExecutionPersistence {
         }
     }
 
+    /**
+     * Updates the final snapshot and saves the result independently.
+     *
+     * <p>Both operations are attempted even if the snapshot update fails.</p>
+     */
     PipelineExecutionResult persistResult(PipelineExecutionResult result) {
         if (repository == null) {
             return result;
