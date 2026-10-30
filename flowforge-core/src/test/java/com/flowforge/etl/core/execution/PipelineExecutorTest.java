@@ -1050,6 +1050,49 @@ class PipelineExecutorTest {
                 exception.executionResult().orElseThrow().status());
     }
 
+
+    @Test
+    void shouldPreservePipelineFailureWhenAuditResultPersistenceAlsoFails() {
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        PipelineExecutionPersistenceException.Operation.SAVE);
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                throw new IllegalStateException("Original ETL failure");
+            }
+        };
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor), null, repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of(
+                        createStep("extract", StepType.EXTRACT, 1)))));
+
+        PipelineExecutionResult originalResult =
+                exception.executionResult().orElseThrow();
+        assertEquals(PipelineStatus.FAILED, originalResult.status());
+        assertEquals("extract", originalResult.failedStepId());
+        assertEquals("Original ETL failure", originalResult.errorMessage());
+        assertEquals(
+                StepExecutionStatus.FAILED,
+                originalResult.stepHistory().get(0).status());
+        assertEquals(
+                PipelineExecutionPersistenceException.Operation.SAVE,
+                exception.failures().get(0).operation());
+        assertEquals(
+                "Simulated repository failure during SAVE",
+                exception.getCause().getMessage());
+    }
+
     private static final class FaultInjectingExecutionRepository
             implements PipelineExecutionRepository {
 
