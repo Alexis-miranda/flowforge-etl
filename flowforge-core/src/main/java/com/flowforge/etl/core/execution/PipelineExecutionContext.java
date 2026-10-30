@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.core.execution;
 
 import java.util.Collections;
@@ -21,10 +20,7 @@ public class PipelineExecutionContext {
      *                                  or the value is null
      */
     public void put(String key, Object value) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Context key must not be blank");
-        }
+        validateKey(key);
 
         if (value == null) {
             throw new IllegalArgumentException(
@@ -41,11 +37,7 @@ public class PipelineExecutionContext {
      * @return the stored value, or null if the key does not exist
      */
     public Object get(String key) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Context key must not be blank");
-        }
-
+        validateKey(key);
         return data.get(key);
     }
 
@@ -60,10 +52,7 @@ public class PipelineExecutionContext {
      * @throws ClassCastException if the stored value has an incompatible type
      */
     public <T> T get(String key, Class<T> type) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Context key must not be blank");
-        }
+        validateKey(key);
 
         if (type == null) {
             throw new IllegalArgumentException(
@@ -78,6 +67,7 @@ public class PipelineExecutionContext {
 
         return type.cast(value);
     }
+
     /**
      * Checks whether the execution context contains the given key.
      *
@@ -86,13 +76,10 @@ public class PipelineExecutionContext {
      * @throws IllegalArgumentException if the key is null or blank
      */
     public boolean contains(String key) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Context key must not be blank");
-        }
-
+        validateKey(key);
         return data.containsKey(key);
     }
+
     /**
      * Removes a value from the execution context.
      *
@@ -101,13 +88,10 @@ public class PipelineExecutionContext {
      * @throws IllegalArgumentException if the key is null or blank
      */
     public Object remove(String key) {
-        if (key == null || key.isBlank()) {
-            throw new IllegalArgumentException(
-                    "Context key must not be blank");
-        }
-
+        validateKey(key);
         return data.remove(key);
     }
+
     /**
      * Removes all entries from the execution context.
      */
@@ -122,5 +106,12 @@ public class PipelineExecutionContext {
      */
     public Map<String, Object> asMap() {
         return Collections.unmodifiableMap(data);
+    }
+
+    private void validateKey(String key) {
+        if (key == null || key.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Context key must not be blank");
+        }
     }
 }
