@@ -1,12 +1,9 @@
-
 package com.flowforge.etl.connectors.sftp;
 
 import org.apache.sshd.client.SshClient;
 import org.apache.sshd.client.session.ClientSession;
 import org.apache.sshd.sftp.client.SftpClientFactory;
 import java.nio.file.Path;
-import org.apache.sshd.client.keyverifier.KnownHostsServerKeyVerifier;
-import org.apache.sshd.client.keyverifier.DefaultKnownHostsServerKeyVerifier;
 import org.apache.sshd.client.keyverifier.KnownHostsServerKeyVerifier;
 import org.apache.sshd.client.keyverifier.RejectAllServerKeyVerifier;
 
@@ -28,14 +25,27 @@ public final class SftpClient
         this.session = session;
         this.sftpClient = sftpClient;
     }
+
     @Override
     public java.io.InputStream read(String remotePath) throws IOException {
-        return sftpClient.read(remotePath);
+        try {
+            return sftpClient.read(remotePath);
+        } catch (IOException exception) {
+            throw SftpFailureClassifier.toStepExecutionFailure(
+                    "Failed to open remote SFTP file for reading: " + remotePath,
+                    exception);
+        }
     }
 
     @Override
     public java.io.OutputStream write(String remotePath) throws IOException {
-        return sftpClient.write(remotePath);
+        try {
+            return sftpClient.write(remotePath);
+        } catch (IOException exception) {
+            throw SftpFailureClassifier.toStepExecutionFailure(
+                    "Failed to open remote SFTP file for writing: " + remotePath,
+                    exception);
+        }
     }
 
     public static SftpClient connectWithPassword(
@@ -72,12 +82,14 @@ public final class SftpClient
 
             return new SftpClient(sshClient, session, sftpClient);
 
-        } catch (IOException | RuntimeException e) {
+        } catch (IOException | RuntimeException exception) {
             if (session != null) {
                 session.close();
             }
             sshClient.stop();
-            throw e;
+            throw SftpFailureClassifier.toStepExecutionFailure(
+                    "Failed to establish SFTP connection to " + host + ":" + port,
+                    exception);
         }
     }
 
