@@ -3,7 +3,6 @@ package com.flowforge.etl.core.execution;
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.domain.PipelineStep;
-import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -22,7 +21,7 @@ public class PipelineExecutor {
 
     private final StepExecutorRegistry executorRegistry;
     private final PipelineExecutionListener listener;
-    private final PipelineExecutionRepository repository;
+    private final PipelineExecutionPersistence persistence;
 
     public PipelineExecutor(List<StepExecutor> stepExecutors) {
         this(stepExecutors, null, null);
@@ -40,7 +39,7 @@ public class PipelineExecutor {
             PipelineExecutionRepository repository) {
         this.executorRegistry = new StepExecutorRegistry(stepExecutors);
         this.listener = listener;
-        this.repository = repository;
+        this.persistence = new PipelineExecutionPersistence(repository);
     }
 
     /** Executes all steps in their configured order. */
@@ -53,7 +52,7 @@ public class PipelineExecutor {
         PipelineExecutionContext context = new PipelineExecutionContext();
         List<StepExecutionRecord> history = new ArrayList<>();
 
-        persistStart(execution);
+        persistence.persistStart(execution);
         notifyStatus(pipeline.id(), execution.status());
 
         List<PipelineStep> steps = pipeline.steps();
@@ -81,7 +80,7 @@ public class PipelineExecutor {
 
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
-        return saveResult(toResult(execution, null, null, history));
+        return persistence.persistResult(toResult(execution, null, null, history));
     }
 
     private PipelineExecutionResult failExecution(
@@ -136,7 +135,8 @@ public class PipelineExecutor {
 
         execution.fail();
         notifyStatus(pipelineId, execution.status());
-        return saveResult(toResult(execution, failedStep.id(), errorMessage, history));
+        return persistence.persistResult(
+                toResult(execution, failedStep.id(), errorMessage, history));
     }
 
     private PipelineExecutionResult toResult(
@@ -153,84 +153,6 @@ public class PipelineExecutor {
                 execution.startedAt(),
                 execution.finishedAt(),
                 history);
-    }
-
-    private void persistStart(PipelineExecution execution) {
-        if (repository == null) {
-            return;
-        }
-        try {
-            repository.start(toSnapshot(execution, null, null));
-        } catch (RuntimeException exception) {
-            throw new PipelineExecutionPersistenceException(
-                    execution.executionId(),
-                    execution.pipelineId(),
-                    List.of(new PipelineExecutionPersistenceException.Failure(
-                            PipelineExecutionPersistenceException.Operation.START,
-                            exception)),
-                    null);
-        }
-    }
-
-    private PipelineExecutionSnapshot toSnapshot(
-            PipelineExecution execution,
-            String failedStepId,
-            String errorMessage) {
-        return new PipelineExecutionSnapshot(
-                execution.executionId(),
-                execution.pipelineId(),
-                execution.status(),
-                failedStepId,
-                errorMessage,
-                execution.startedAt(),
-                execution.finishedAt());
-    }
-
-    /**
-     * Persists the final snapshot and result independently. A failure in one
-     * operation must not prevent attempting the other operation.
-     *
-     * @throws PipelineExecutionPersistenceException when any persistence
-     *         operation fails; the exception retains the execution result
-     */
-    private PipelineExecutionResult saveResult(PipelineExecutionResult result) {
-        if (repository == null) {
-            return result;
-        }
-
-        List<PipelineExecutionPersistenceException.Failure> failures =
-                new ArrayList<>();
-        try {
-            repository.update(new PipelineExecutionSnapshot(
-                    result.executionId(),
-                    result.pipelineId(),
-                    result.status(),
-                    result.failedStepId(),
-                    result.errorMessage(),
-                    result.startedAt(),
-                    result.finishedAt()));
-        } catch (RuntimeException exception) {
-            failures.add(new PipelineExecutionPersistenceException.Failure(
-                    PipelineExecutionPersistenceException.Operation.UPDATE,
-                    exception));
-        }
-
-        try {
-            repository.save(result);
-        } catch (RuntimeException exception) {
-            failures.add(new PipelineExecutionPersistenceException.Failure(
-                    PipelineExecutionPersistenceException.Operation.SAVE,
-                    exception));
-        }
-
-        if (!failures.isEmpty()) {
-            throw new PipelineExecutionPersistenceException(
-                    result.executionId(),
-                    result.pipelineId(),
-                    failures,
-                    result);
-        }
-        return result;
     }
 
     /** Notifies the listener without interrupting execution if it fails. */
