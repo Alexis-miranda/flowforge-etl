@@ -142,7 +142,7 @@ The Cash pipeline uses the following tables:
 | `dbo.CashOutputDelivery` | Persist the serialized output payload, SHA-256 hash, publication status and error details |
 | `dbo.ETLExecution` | Execution audit schema, where configured by the application |
 
-SQL schema scripts are maintained under `docs/sql/`. Apply the appropriate schema scripts to the target development database before running the pipeline. Verify the actual table definitions and database permissions for your environment.
+Cash-specific SQL schema scripts are maintained under `docs/cash/sql/`. The generic pipeline-execution audit schema remains under `docs/sql/`. Apply the appropriate schema scripts to the target development database before running the pipeline. Verify the actual table definitions and database permissions for your environment.
 
 The output-delivery state is tracked as `PENDING` or `PUBLISHED`. The publisher verifies the payload hash before publication. If a file already exists at the target path, the publisher verifies its contents rather than blindly overwriting it.
 
@@ -324,8 +324,10 @@ flowforge-etl/
 │   ├── pom.xml
 │   └── src/ (Cash CLI, execution, validation, persistence and delivery)
 └── docs/
+    ├── cash/
+    │   └── sql/ (Cash-specific database schemas)
     ├── images/
-    └── sql/
+    └── sql/ (generic execution-audit schema)
 ```
 
 This is a simplified view; individual packages may contain additional classes and tests.
