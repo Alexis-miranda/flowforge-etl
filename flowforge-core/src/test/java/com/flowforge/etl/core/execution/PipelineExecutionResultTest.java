@@ -240,6 +240,33 @@ class PipelineExecutionResultTest {
     }
 
     @Test
+    void shouldRejectPipelineErrorMessageThatDiffersFromFailedStep() {
+        StepExecutionRecord failedStep = new StepExecutionRecord(
+                "transform",
+                "Transform",
+                StepExecutionStatus.FAILED,
+                STARTED_AT,
+                FINISHED_AT,
+                IllegalStateException.class.getName(),
+                "Step-level error",
+                null,
+                null,
+                null);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecutionResult(
+                        EXECUTION_ID,
+                        PIPELINE_ID,
+                        PipelineStatus.FAILED,
+                        "transform",
+                        "Different pipeline-level error",
+                        STARTED_AT,
+                        FINISHED_AT,
+                        java.util.List.of(failedStep)));
+    }
+
+    @Test
     void shouldAcceptConsistentFailedStepHistory() {
         StepExecutionRecord succeededStep = new StepExecutionRecord(
                 "extract",
