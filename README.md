@@ -35,6 +35,19 @@ The project is built with **Java 21**, **Apache Maven**, **JUnit 5**, and **SQL 
 
 The standard test run includes tests that require external services; skipped tests are not counted as successful integration executions. See the test report for the separately recorded SQL Server end-to-end scenario.
 
+## Relevance to data integration and DevOps roles
+
+FlowForge demonstrates several concepts used in data-integration and platform-support environments:
+
+- Building and executing modular Java pipelines.
+- Processing and validating structured CSV data.
+- Persisting operational data and execution information in SQL Server.
+- Transferring files through SFTP with SSH host-key verification.
+- Tracking execution outcomes and diagnosing connector failures.
+- Separating reusable infrastructure from application-specific business logic.
+
+**Technology scope:** Kafka and IBM MQ are not currently integrated into FlowForge. They remain learning/integration goals and are not presented as implemented project features.
+
 ## Features
 
 - **CSV extraction:** read input records, including UTF-8 CSV files.
