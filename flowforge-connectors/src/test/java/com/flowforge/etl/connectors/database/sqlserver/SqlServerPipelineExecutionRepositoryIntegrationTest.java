@@ -64,8 +64,7 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         assertEquals(startedAt, persistedRunning.startedAt());
         assertEquals(null, persistedRunning.finishedAt());
 
-        Instant finishedAt = Instant.now()
-                .truncatedTo(ChronoUnit.MICROS);
+        Instant finishedAt = startedAt.plusSeconds(2);
 
         PipelineExecutionSnapshot succeeded =
                 new PipelineExecutionSnapshot(
