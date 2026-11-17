@@ -3,8 +3,11 @@ package com.flowforge.etl.connectors.database.sqlserver;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.StepExecutionRecord;
+import com.flowforge.etl.core.execution.StepExecutionStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Assumptions;
@@ -77,6 +80,20 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         // Update the same row to its final status.
         repository.update(succeeded);
 
+        Instant stepStartedAt = startedAt.plusSeconds(1);
+        Instant stepFinishedAt = stepStartedAt.plus(Duration.ofMillis(250));
+        StepExecutionRecord completedStep = new StepExecutionRecord(
+                "extract",
+                "Extract input CSV",
+                StepExecutionStatus.SUCCEEDED,
+                stepStartedAt,
+                stepFinishedAt,
+                null,
+                null,
+                null,
+                null,
+                null);
+
         PipelineExecutionResult result =
                 new PipelineExecutionResult(
                         executionId,
@@ -85,7 +102,8 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
                         null,
                         null,
                         startedAt,
-                        finishedAt);
+                        finishedAt,
+                        List.of(completedStep));
 
         // Verify that the final result is already persisted.
         repository.save(result);
@@ -112,6 +130,16 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         assertEquals(executionId, persistedResult.executionId());
         assertEquals(PipelineStatus.SUCCEEDED, persistedResult.status());
         assertEquals(finishedAt, persistedResult.finishedAt());
+        assertEquals(1, persistedResult.stepHistory().size());
+        assertEquals("extract", persistedResult.stepHistory().get(0).stepId());
+        assertEquals("Extract input CSV",
+                persistedResult.stepHistory().get(0).stepName());
+        assertEquals(StepExecutionStatus.SUCCEEDED,
+                persistedResult.stepHistory().get(0).status());
+        assertEquals(stepStartedAt,
+                persistedResult.stepHistory().get(0).startedAt());
+        assertEquals(stepFinishedAt,
+                persistedResult.stepHistory().get(0).finishedAt());
 
         assertNotNull(persistedResult.duration());
     }
