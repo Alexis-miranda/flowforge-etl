@@ -192,10 +192,12 @@ public final class SqlServerPipelineExecutionRepository
                 }
                 connection.commit();
             } catch (SQLException | RuntimeException exception) {
-                connection.rollback();
+                try {
+                    connection.rollback();
+                } catch (SQLException rollbackException) {
+                    exception.addSuppressed(rollbackException);
+                }
                 throw exception;
-            } finally {
-                connection.setAutoCommit(true);
             }
         } catch (SQLException exception) {
             throw new IllegalStateException(
