@@ -140,6 +140,20 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         assertEquals(stepFinishedAt,
                 persistedResult.stepHistory().get(0).finishedAt());
 
+        // Saving the same result again must replace, not duplicate, its history.
+        repository.save(result);
+        PipelineExecutionResult repeatedSaveResult =
+                repository.findByExecutionId(executionId).orElseThrow();
+        assertEquals(1, repeatedSaveResult.stepHistory().size());
+
+        // Pipeline-level lookup must hydrate step history as well.
+        List<PipelineExecutionResult> pipelineResults =
+                repository.findByPipelineId(pipelineId);
+        assertEquals(1, pipelineResults.size());
+        assertEquals(1, pipelineResults.get(0).stepHistory().size());
+        assertEquals("extract",
+                pipelineResults.get(0).stepHistory().get(0).stepId());
+
         assertNotNull(persistedResult.duration());
     }
 }
