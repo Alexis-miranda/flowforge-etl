@@ -29,6 +29,7 @@ Built with **Java 21, Maven, JUnit 5 and SQL Server**. This project is under act
 ## Key features
 
 - **Modular pipeline engine:** sequential execution, shared context, execution results and failure diagnostics.
+- **Execution audit history:** SQL Server persistence and restoration of completed step-by-step execution diagnostics.
 - **CSV processing:** extraction, validation, accepted/rejected record handling and configurable UTF-8 output.
 - **SQL Server persistence:** Cash data, load information and output-delivery state.
 - **Reliable file delivery:** SHA-256 payload verification and recovery of pending FRONT deliveries without rerunning ingestion.
@@ -78,9 +79,9 @@ mvn clean verify
 
 ### Test information
 
-The latest test run recorded in this repository reports **177 tests, 0 failures, 0 errors and 6 skipped**. Skipped tests are not counted as successful integration executions.
+The GitHub Actions workflow builds the Cash module and its Maven dependencies with Java 21. SQL Server integration tests are conditional: they are skipped when `FLOWFORGE_DB_JDBC_URL`, `FLOWFORGE_DB_USER` and `FLOWFORGE_DB_PASSWORD` are not configured. A green CI run therefore confirms the Maven build and tests that ran, but does not by itself prove connectivity to a real SQL Server instance.
 
-See the [end-to-end test report](docs/ETL-E2E-TEST-2026-10-25.md) for details. These results document development testing, not production certification.
+For the SQL Server execution-audit schema and local verification steps, see [Execution history persistence](docs/EXECUTION-HISTORY-PERSISTENCE.md). The [end-to-end test report](docs/ETL-E2E-TEST-2026-10-25.md) documents a previous local Cash test, not a current CI result.
 
 ## Project status
 
