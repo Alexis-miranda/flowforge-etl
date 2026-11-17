@@ -292,15 +292,19 @@ public final class SqlServerPipelineExecutionRepository
             statement.setString(1, pipelineId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 while (resultSet.next()) {
-                    results.add(readResult(connection, resultSet));
+                    results.add(readResultHeader(resultSet));
                 }
             }
+            List<PipelineExecutionResult> hydrated = new ArrayList<>();
+            for (PipelineExecutionResult header : results) {
+                hydrated.add(withStepHistory(connection, header));
+            }
+            return List.copyOf(hydrated);
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Could not find pipeline execution results",
                     exception);
         }
-        return List.copyOf(results);
     }
 
     @Override
@@ -313,12 +317,14 @@ public final class SqlServerPipelineExecutionRepository
              PreparedStatement statement =
                      connection.prepareStatement(FIND_RESULT_SQL)) {
             statement.setString(1, executionId);
+            PipelineExecutionResult header;
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()) {
                     return Optional.empty();
                 }
-                return Optional.of(readResult(connection, resultSet));
+                header = readResultHeader(resultSet);
             }
+            return Optional.of(withStepHistory(connection, header));
         } catch (SQLException exception) {
             throw new IllegalStateException(
                     "Could not find pipeline execution result",
@@ -383,20 +389,31 @@ public final class SqlServerPipelineExecutionRepository
                 finishedAt == null ? null : finishedAt.toInstant());
     }
 
-    private static PipelineExecutionResult readResult(
-            Connection connection,
+    private static PipelineExecutionResult readResultHeader(
             ResultSet resultSet) throws SQLException {
         Timestamp finishedAt = resultSet.getTimestamp("FinishedAt");
-        String executionId = resultSet.getString("ExecutionId");
         return new PipelineExecutionResult(
-                executionId,
+                resultSet.getString("ExecutionId"),
                 resultSet.getString("PipelineId"),
                 PipelineStatus.valueOf(resultSet.getString("Status")),
                 resultSet.getString("FailedStepId"),
                 resultSet.getString("ErrorMessage"),
                 resultSet.getTimestamp("StartedAt").toInstant(),
-                finishedAt == null ? null : finishedAt.toInstant(),
-                readStepHistory(connection, executionId));
+                finishedAt == null ? null : finishedAt.toInstant());
+    }
+
+    private static PipelineExecutionResult withStepHistory(
+            Connection connection,
+            PipelineExecutionResult header) throws SQLException {
+        return new PipelineExecutionResult(
+                header.executionId(),
+                header.pipelineId(),
+                header.status(),
+                header.failedStepId(),
+                header.errorMessage(),
+                header.startedAt(),
+                header.finishedAt(),
+                readStepHistory(connection, header.executionId()));
     }
 
     private static List<StepExecutionRecord> readStepHistory(
