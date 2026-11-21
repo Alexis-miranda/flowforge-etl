@@ -46,11 +46,7 @@ public class CashFrontCsvPrepareLoader implements StepExecutor {
                             + "underscores and hyphens");
         }
 
-        Object input = context.get(inputKey);
-        if (!(input instanceof List<?> records)) {
-            throw new IllegalArgumentException(
-                    "Input data must be a list of records: " + inputKey);
-        }
+        List<?> records = context.getRequired(inputKey, List.class);
 
         char delimiter = resolveDelimiter(
                 step.configuration().get("delimiter"));
