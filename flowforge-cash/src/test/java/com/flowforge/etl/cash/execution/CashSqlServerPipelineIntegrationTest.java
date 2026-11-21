@@ -7,6 +7,8 @@ import com.flowforge.etl.cash.persistence.SqlServerCashStagingLoader;
 import com.flowforge.etl.cash.delivery.CashFrontCsvLoader;
 import com.flowforge.etl.cash.delivery.CashFrontCsvPrepareLoader;
 import com.flowforge.etl.cash.delivery.CashOutputPublisherLoader;
+import com.flowforge.etl.cash.delivery.LocalFilePublisher;
+import com.flowforge.etl.cash.delivery.SqlServerCashOutputDeliveryRepository;
 import com.flowforge.etl.connectors.file.csv.CsvExtractor;
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
@@ -160,7 +162,9 @@ class CashSqlServerPipelineIntegrationTest {
                     new CashValidator(),
                     new CashFrontCsvPrepareLoader(),
                     new SqlServerCashStagingLoader(),
-                    new CashOutputPublisherLoader(),
+                    new CashOutputPublisherLoader(
+                            new SqlServerCashOutputDeliveryRepository(),
+                            new LocalFilePublisher()),
                     new CashFrontCsvLoader()
             );
 
