@@ -6,6 +6,10 @@ import java.util.Map;
 
 /**
  * Stores shared data during a pipeline execution.
+ *
+ * <p>Values are stored as objects because pipeline steps exchange different
+ * kinds of data. Callers can use the typed accessors to validate values when
+ * retrieving them.</p>
  */
 public class PipelineExecutionContext {
 
@@ -31,10 +35,11 @@ public class PipelineExecutionContext {
     }
 
     /**
-     * Retrieves a value from the execution context.
+     * Retrieves a value from the execution context without checking its type.
      *
      * @param key the data key
      * @return the stored value, or null if the key does not exist
+     * @throws IllegalArgumentException if the key is null or blank
      */
     public Object get(String key) {
         validateKey(key);
@@ -42,7 +47,7 @@ public class PipelineExecutionContext {
     }
 
     /**
-     * Retrieves a value from the execution context and checks its type.
+     * Retrieves an optional value from the execution context and checks its type.
      *
      * @param key the data key
      * @param type the expected value type
@@ -71,12 +76,16 @@ public class PipelineExecutionContext {
     /**
      * Retrieves a required value from the execution context and checks its type.
      *
+     * <p>Unlike {@link #get(String, Class)}, this method rejects both a missing
+     * value and a value with an incompatible type using
+     * {@link IllegalArgumentException}.</p>
+     *
      * @param key the data key
      * @param type the expected value type
      * @param <T> the expected value type
      * @return the stored value cast to the expected type
-     * @throws IllegalArgumentException if the key, type, or stored value is invalid,
-     *                                  or no value exists
+     * @throws IllegalArgumentException if the key or type is invalid, the value
+     *                                  is missing, or its type is incompatible
      */
     public <T> T getRequired(String key, Class<T> type) {
         validateKey(key);
@@ -134,9 +143,12 @@ public class PipelineExecutionContext {
     }
 
     /**
-     * Returns an unmodifiable view of the stored data.
+     * Returns an unmodifiable, live view of the stored data.
      *
-     * @return an unmodifiable map of the context data
+     * <p>The returned map cannot be modified directly, but it reflects
+     * subsequent changes made through this context.</p>
+     *
+     * @return an unmodifiable view of the context data
      */
     public Map<String, Object> asMap() {
         return Collections.unmodifiableMap(data);
