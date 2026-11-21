@@ -1,11 +1,11 @@
 # FlowForge ETL
 
 <p align="center">
-  <img src="docs/images/flowforge-cover.png" alt="FlowForge ETL" width="200" />
+  <img src="docs/images/flowforge-cover.png" alt="FlowForge ETL" width="520" />
 </p>
 
 <p align="center">
-  <strong>A modular ETL platform built with Java 21</strong><br />
+  <strong>A modular ETL application built with Java 21</strong><br />
   Extract · Transform · Load
 </p>
 
@@ -16,57 +16,57 @@
   <img src="https://img.shields.io/badge/Status-In%20Development-yellow" alt="In development" />
 </p>
 
----
+## What is FlowForge ETL?
 
-## Overview
+FlowForge ETL is a modular Java application that automates a data-processing workflow: it reads CSV files, validates records, separates accepted and rejected data, stores results in SQL Server, and delivers generated output files.
 
-**FlowForge ETL** is a personal Java project exploring how to build a modular Extract, Transform, Load (ETL) platform. It separates pipeline execution from external connectors and processes data through configurable steps.
+## The problem it addresses
 
-The current use case is a Cash data workflow: reading CSV files, validating records, separating accepted and rejected data, persisting results in SQL Server, and delivering generated FRONT CSV files. The project also includes SFTP transfers with SSH host-key verification.
+Moving data between files, databases, and external systems can involve repetitive manual steps and make failures difficult to track or recover from.
 
-Built with **Java 21, Maven, JUnit 5 and SQL Server**. This project is under active development and is not presented as production-certified software.
+FlowForge brings these steps into one pipeline. It keeps processing stages separate, records execution and delivery state, and allows pending file deliveries to be retried without running the entire ingestion process again.
 
-## Key features
+## How it works
 
-- **Modular pipeline engine:** sequential execution, shared context, execution results and failure diagnostics.
-- **CSV processing:** extraction, validation, accepted/rejected record handling and configurable UTF-8 output.
-- **SQL Server persistence:** Cash data, load information and output-delivery state.
-- **Reliable file delivery:** SHA-256 payload verification and recovery of pending FRONT deliveries without rerunning ingestion.
-- **Secure SFTP:** file upload/download with SSH host-key verification.
-- **Automated tests:** unit tests and optional integration tests.
+1. **Extract** — reads incoming CSV files.
+2. **Validate** — checks records and separates accepted and rejected data.
+3. **Load** — persists the processed data and execution information in SQL Server.
+4. **Deliver** — generates output CSV files and transfers them through SFTP.
+5. **Track & recover** — records delivery status and supports retrying pending deliveries.
+
+## Main features
+
+- Modular pipeline engine with shared execution context.
+- CSV extraction, validation, and serialization.
+- SQL Server persistence and execution tracking.
+- Accepted/rejected record handling.
+- Output delivery tracking and recovery.
+- SFTP transfers with SSH host-key verification.
+- Automated unit tests and optional integration tests.
 
 ## Architecture
 
-The project uses a Maven multi-module structure:
+The project is organized as a Maven multi-module application:
 
 | Module | Responsibility |
 | --- | --- |
-| `flowforge-core` | Pipeline model, execution engine, shared context and generic abstractions |
-| `flowforge-connectors` | Reusable CSV, SQL Server and SFTP connectors |
-| `flowforge-cash` | Cash validation, persistence, FRONT delivery, pipeline composition and CLI |
+| `flowforge-core` | Pipeline model, execution engine, shared context, and generic abstractions |
+| `flowforge-connectors` | CSV, SQL Server, and SFTP connectors |
+| `flowforge-cash` | Cash-specific validation, persistence, pipeline composition, delivery, and CLI |
 
-This separation keeps reusable execution logic and technology-specific connectors independent from Cash business rules.
+This separation keeps the pipeline engine and reusable connectors independent from the business workflow.
 
-## Technology relevance
+## Tech stack
 
-FlowForge demonstrates practical work with Java pipelines, ETL processing, SQL persistence, secure file transfer, execution tracking and connector-failure diagnosis.
+**Java 21** · **Maven** · **SQL Server** · **JUnit 5** · **Mockito** · **SFTP / SSH**
 
-**Kafka and IBM MQ are not currently integrated into FlowForge.** They remain learning and future integration goals, not implemented features.
+## Run locally
 
-## Build and test
-
-**Prerequisites:** JDK 21, Apache Maven and Git. SQL Server is required for the Cash database workflow; Docker can be used for the optional SFTP integration test.
-
-Clone the repository:
+**Prerequisites:** JDK 21, Apache Maven, and Git. SQL Server is needed to run the Cash database workflow.
 
 ```bash
 git clone https://github.com/Alexis-miranda/flowforge-etl.git
 cd flowforge-etl
-```
-
-Run the Cash tests and required upstream modules:
-
-```bash
 mvn -pl flowforge-cash -am test
 ```
 
@@ -76,40 +76,23 @@ Build and verify all modules:
 mvn clean verify
 ```
 
-### Test information
-
-The latest test run recorded in this repository reports **177 tests, 0 failures, 0 errors and 6 skipped**. Skipped tests are not counted as successful integration executions.
-
-See the [end-to-end test report](docs/ETL-E2E-TEST-2026-10-25.md) for details. These results document development testing, not production certification.
+See the [end-to-end test report](docs/ETL-E2E-TEST-2026-10-25.md) for the recorded test results. Integration tests may require additional services and configuration.
 
 ## Project status
 
-**Under active development.**
+**In development.** The core pipeline, CSV processing, Cash validation, SQL Server persistence, delivery tracking/recovery, and SFTP transfer support are implemented.
 
-Implemented capabilities include the core execution engine, CSV extraction and serialization, Cash validation, SQL Server persistence, output-delivery tracking and recovery, and SFTP transfers with SSH host-key verification.
-
-Before production use, the official FRONT file contract, field mappings, BackOffice identifiers, operational monitoring, database permissions and deployment security settings must be confirmed.
+The workflow is a personal development project and is not production-certified. Production use would require confirming the official file specification, mappings, operational monitoring, database permissions, and deployment security.
 
 ## Roadmap
 
-- [x] Core pipeline execution and shared context
-- [x] CSV extraction, validation and serialization
-- [x] SQL Server Cash persistence
-- [x] Accepted/rejected record handling
-- [x] FRONT output delivery tracking and recovery
-- [x] SFTP transfer support and SSH host-key verification
-- [ ] Confirm official FRONT specification and production mappings
-- [ ] Additional transformation types
-- [ ] RabbitMQ and IBM MQ integrations
-- [ ] Spring Boot web interface
-- [ ] Windows service deployment
-
-## License
-
-No license has been selected yet. Until a license is added, permissions for reuse and redistribution are not explicitly granted.
+- [ ] Confirm official output-file specification and production mappings.
+- [ ] Add further transformation types.
+- [ ] Explore message-broker integrations (RabbitMQ / IBM MQ).
+- [ ] Evaluate a Spring Boot interface and service deployment.
 
 ---
 
 <p align="center">
-  <sub>Built with Java ☕ and a focus on clean, modular ETL architecture.</sub>
+  <sub>Built with Java ☕</sub>
 </p>
