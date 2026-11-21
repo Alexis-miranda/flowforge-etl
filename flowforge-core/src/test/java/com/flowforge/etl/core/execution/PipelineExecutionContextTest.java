@@ -104,7 +104,7 @@ class PipelineExecutionContextTest {
         context.put("count", 42);
 
         assertThrows(
-                ClassCastException.class,
+                IllegalArgumentException.class,
                 () -> context.getRequired("count", String.class)
         );
     }
