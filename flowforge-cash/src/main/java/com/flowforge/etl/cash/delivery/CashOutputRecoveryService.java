@@ -19,25 +19,15 @@ public class CashOutputRecoveryService {
     private final StepExecutor publisher;
 
     /**
-     * Creates the recovery service with the production SQL Server and local
-     * filesystem adapters.
-     */
-    public CashOutputRecoveryService() {
-        SqlServerCashOutputDeliveryRepository repository =
-                new SqlServerCashOutputDeliveryRepository();
-        this.deliveryRepository = repository;
-        this.publisher = new CashOutputPublisherLoader(
-                repository, new LocalFilePublisher());
-    }
-
-    /**
-     * Creates the service with explicit collaborators for testing and reuse.
+     * Creates the service with explicit collaborators.
      */
     public CashOutputRecoveryService(
             CashOutputDeliveryRepository deliveryRepository,
             StepExecutor publisher) {
-        this.deliveryRepository = deliveryRepository;
-        this.publisher = publisher;
+        this.deliveryRepository = java.util.Objects.requireNonNull(
+                deliveryRepository, "deliveryRepository must not be null");
+        this.publisher = java.util.Objects.requireNonNull(
+                publisher, "publisher must not be null");
     }
 
     public RecoveryResult recoverPending() {
