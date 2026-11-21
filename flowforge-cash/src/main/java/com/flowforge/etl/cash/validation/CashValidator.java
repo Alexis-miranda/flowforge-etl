@@ -137,7 +137,11 @@ public class CashValidator implements StepExecutor {
         }
 
         try {
-            new BigDecimal(amount.trim());
+            BigDecimal parsedAmount = new BigDecimal(amount.trim());
+
+            if (parsedAmount.signum() < 0) {
+                return "Amount must be zero or positive: " + amount;
+            }
         } catch (NumberFormatException exception) {
             return "Invalid amount: " + amount;
         }
