@@ -39,18 +39,7 @@ public class ColumnMappingTransformer implements StepExecutor {
 
         Map<String, String> mappings = parseMappings(mappingsValue);
 
-        if (!context.contains(inputKey)) {
-            throw new IllegalArgumentException(
-                    "Missing input data in execution context: " + inputKey
-            );
-        }
-
-        Object input = context.get(inputKey);
-        if (!(input instanceof List<?> records)) {
-            throw new IllegalArgumentException(
-                    "Input data must be a list of records: " + inputKey
-            );
-        }
+        List<?> records = context.getRequired(inputKey, List.class);
 
         List<Map<String, String>> result = new ArrayList<>();
 
