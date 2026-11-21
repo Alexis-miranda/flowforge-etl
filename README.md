@@ -1,7 +1,7 @@
 # FlowForge ETL
 
 <p align="center">
-  <img src="docs/images/flowforge-cover.png" alt="FlowForge ETL" width="520" />
+  <img src="docs/images/flowforge-etl.svg" alt="FlowForge ETL" width="520" />
 </p>
 
 <p align="center">
