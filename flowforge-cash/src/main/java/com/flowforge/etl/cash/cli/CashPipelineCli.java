@@ -1,26 +1,15 @@
 package com.flowforge.etl.cash.cli;
 
+import com.flowforge.etl.cash.execution.CashPipelineDefinitionFactory;
 import com.flowforge.etl.cash.execution.PipelineExecutorFactory;
-
 import com.flowforge.etl.core.domain.PipelineDefinition;
-import com.flowforge.etl.core.domain.PipelineStep;
-import com.flowforge.etl.core.domain.StepConfiguration;
-import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutor;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 public final class CashPipelineCli {
-
-    private static final DateTimeFormatter TIMESTAMP =
-            DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss");
 
     private CashPipelineCli() {
     }
@@ -79,82 +68,8 @@ public final class CashPipelineCli {
                     "backOfficeCode may contain only letters, digits, '_' and '-'.");
         }
 
-        String timestamp = LocalDateTime.now().format(TIMESTAMP);
-        String runId = UUID.randomUUID().toString();
-
-        PipelineDefinition pipeline = new PipelineDefinition(
-                "cash-" + runId,
-                "Cash ETL",
-                "Extract, validate, prepare, persist and publish FRONT Cash CSV",
-                List.of(
-                        new PipelineStep(
-                                "extract-cash",
-                                "Extract input CSV",
-                                StepType.EXTRACT,
-                                1,
-                                config(Map.of(
-                                        "connector", "default",
-                                        "path", input.toString(),
-                                        "outputKey", "rawCashRecords",
-                                        "delimiter", ",",
-                                        "requiredHeaders",
-                                        "accountCode,adjustmentId,currency,amount"
-                                ))
-                        ),
-                        new PipelineStep(
-                                "validate-cash",
-                                "Validate Cash records",
-                                StepType.TRANSFORM,
-                                2,
-                                config(Map.of(
-                                        "connector", "cash-validator",
-                                        "inputKey", "rawCashRecords",
-                                        "validOutputKey", "validCash",
-                                        "rejectedOutputKey", "rejectedCash"
-                                ))
-                        ),
-                        new PipelineStep(
-                                "prepare-front-cash",
-                                "Prepare FRONT CSV payload",
-                                StepType.LOAD,
-                                3,
-                                config(Map.of(
-                                        "connector", "cash-front-csv-prepare",
-                                        "inputKey", "validCash",
-                                        "outputDirectory",
-                                        outputDirectory.toString(),
-                                        "backOfficeCode", backOfficeCode,
-                                        "columns", columns,
-                                        "delimiter", ",",
-                                        "timestamp", timestamp
-                                ))
-                        ),
-                        new PipelineStep(
-                                "persist-cash",
-                                "Persist cash records and pending delivery",
-                                StepType.LOAD,
-                                4,
-                                config(Map.of(
-                                        "connector", "sqlserver",
-                                        "inputKey", "validCash",
-                                        "rejectedInputKey", "rejectedCash",
-                                        "rawInputKey", "rawCashRecords",
-                                        "sourceFile", sourceFile,
-                                        "backOfficeCode", backOfficeCode
-                                ))
-                        ),
-                        new PipelineStep(
-                                "publish-front-cash",
-                                "Publish FRONT CSV",
-                                StepType.LOAD,
-                                5,
-                                config(Map.of(
-                                        "connector", "cash-output-publisher",
-                                        "sourceFile", sourceFile
-                                ))
-                        )
-                )
-        );
+        PipelineDefinition pipeline = CashPipelineDefinitionFactory.create(
+                input, backOfficeCode, outputDirectory, columns, sourceFile);
 
         System.out.println("Starting Cash ETL");
         System.out.println("Input: " + input);
@@ -176,11 +91,6 @@ public final class CashPipelineCli {
         }
 
         System.out.println("Cash ETL completed successfully.");
-    }
-
-    private static StepConfiguration config(
-            Map<String, String> properties) {
-        return new StepConfiguration(properties);
     }
 
     private static void printUsage() {
