@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.core.execution;
 
 import org.junit.jupiter.api.Test;
@@ -50,16 +49,6 @@ class PipelineExecutionContextTest {
     }
 
     @Test
-    void shouldExposeUnmodifiableMap() {
-        PipelineExecutionContext context = new PipelineExecutionContext();
-        context.put("status", "running");
-
-        assertThrows(
-                UnsupportedOperationException.class,
-                () -> context.asMap().put("status", "failed")
-        );
-    }
-    @Test
     void shouldRetrieveValueUsingExpectedType() {
         PipelineExecutionContext context = new PipelineExecutionContext();
         context.put("name", "FlowForge");
@@ -73,9 +62,38 @@ class PipelineExecutionContextTest {
     void shouldReturnNullWhenTypedValueDoesNotExist() {
         PipelineExecutionContext context = new PipelineExecutionContext();
 
-        String value = context.get("missing", String.class);
+        assertNull(context.get("missing", String.class));
+    }
 
-        assertNull(value);
+    @Test
+    void shouldRejectValueWithIncompatibleType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("count", 42);
+
+        assertThrows(
+                ClassCastException.class,
+                () -> context.get("count", String.class)
+        );
+    }
+
+    @Test
+    void shouldRejectNullExpectedTypeWhenUsingTypedGet() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.get("name", null)
+        );
+    }
+
+    @Test
+    void shouldRejectBlankKeyWhenRetrievingTypedValue() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.get("   ", String.class)
+        );
     }
 
     @Test
@@ -92,9 +110,14 @@ class PipelineExecutionContextTest {
     void shouldRejectMissingRequiredValue() {
         PipelineExecutionContext context = new PipelineExecutionContext();
 
-        assertThrows(
+        IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> context.getRequired("missing", String.class)
+        );
+
+        assertEquals(
+                "Missing required context value: missing",
+                exception.getMessage()
         );
     }
 
@@ -103,32 +126,37 @@ class PipelineExecutionContextTest {
         PipelineExecutionContext context = new PipelineExecutionContext();
         context.put("count", 42);
 
-        assertThrows(
+        IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> context.getRequired("count", String.class)
         );
-    }
 
-    @Test
-    void shouldRejectValueWithIncompatibleType() {
-        PipelineExecutionContext context = new PipelineExecutionContext();
-        context.put("count", 42);
-
-        assertThrows(
-                ClassCastException.class,
-                () -> context.get("count", String.class)
+        assertEquals(
+                "Context value for key 'count' must be of type String",
+                exception.getMessage()
         );
     }
 
     @Test
-    void shouldRejectNullExpectedType() {
+    void shouldRejectNullExpectedTypeWhenUsingRequiredGet() {
         PipelineExecutionContext context = new PipelineExecutionContext();
 
         assertThrows(
                 IllegalArgumentException.class,
-                () -> context.get("name", null)
+                () -> context.getRequired("name", null)
         );
     }
+
+    @Test
+    void shouldRejectBlankKeyWhenRetrievingRequiredValue() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.getRequired("   ", String.class)
+        );
+    }
+
     @Test
     void shouldReturnTrueWhenKeyExists() {
         PipelineExecutionContext context = new PipelineExecutionContext();
@@ -153,8 +181,9 @@ class PipelineExecutionContextTest {
                 () -> context.contains(null)
         );
     }
+
     @Test
-    void shouldRemoveExistingKey() {
+    void shouldRemoveExistingKeyAndReturnItsValue() {
         PipelineExecutionContext context = new PipelineExecutionContext();
         context.put("name", "FlowForge");
 
@@ -162,15 +191,14 @@ class PipelineExecutionContextTest {
 
         assertEquals("FlowForge", removedValue);
         assertFalse(context.contains("name"));
+        assertNull(context.get("name"));
     }
 
     @Test
     void shouldReturnNullWhenRemovingMissingKey() {
         PipelineExecutionContext context = new PipelineExecutionContext();
 
-        Object removedValue = context.remove("missing");
-
-        assertNull(removedValue);
+        assertNull(context.remove("missing"));
     }
 
     @Test
@@ -192,6 +220,7 @@ class PipelineExecutionContextTest {
                 () -> context.remove("   ")
         );
     }
+
     @Test
     void shouldRemoveAllEntriesWhenClearingContext() {
         PipelineExecutionContext context = new PipelineExecutionContext();
@@ -216,17 +245,6 @@ class PipelineExecutionContextTest {
         assertFalse(context.contains("name"));
         assertEquals("ready", context.get("status"));
     }
-/**
-    @Test
-    void shouldDistinguishExistingKeyWithNullValueFromMissingKey() {
-        PipelineExecutionContext context = new PipelineExecutionContext();
-        context.put("optional", null);
-
-        assertTrue(context.contains("optional"));
-        assertNull(context.get("optional"));
-        assertFalse(context.contains("missing"));
-    }**/
-
 
     @Test
     void shouldRejectNullValue() {
@@ -239,38 +257,20 @@ class PipelineExecutionContextTest {
     }
 
     @Test
-    void shouldReflectContextChangesInExistingMapView() {
+    void shouldExposeUnmodifiableLiveMapView() {
         PipelineExecutionContext context = new PipelineExecutionContext();
         Map<String, Object> view = context.asMap();
 
         context.put("name", "FlowForge");
 
         assertEquals("FlowForge", view.get("name"));
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> view.put("status", "failed")
+        );
 
         context.remove("name");
 
         assertFalse(view.containsKey("name"));
     }
-    @Test
-    void shouldRejectBlankKeyWhenRetrievingTypedValue() {
-        PipelineExecutionContext context = new PipelineExecutionContext();
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> context.get("   ", String.class)
-        );
-    }
-
-    @Test
-    void shouldReturnRemovedValueAndRemoveKey() {
-        PipelineExecutionContext context = new PipelineExecutionContext();
-        context.put("count", 42);
-
-        Object removedValue = context.remove("count");
-
-        assertEquals(42, removedValue);
-        assertFalse(context.contains("count"));
-        assertNull(context.get("count"));
-    }
-
 }
