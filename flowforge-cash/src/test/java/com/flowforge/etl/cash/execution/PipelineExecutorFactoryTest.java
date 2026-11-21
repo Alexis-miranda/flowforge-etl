@@ -11,6 +11,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PipelineExecutorFactoryTest {
@@ -23,7 +24,7 @@ class PipelineExecutorFactoryTest {
     }
 
     @Test
-    void shouldRegisterCashOutputPublisherUsingProvidedRepository() {
+    void shouldIncludeCashOutputPublisherInBuiltInExecutors() {
         CashOutputDeliveryRepository repository = new FakeDeliveryRepository();
 
         List<StepExecutor> executors =
@@ -33,6 +34,12 @@ class PipelineExecutorFactoryTest {
         assertTrue(executors.stream().anyMatch(executor ->
                 executor.supportedType() == StepType.LOAD
                         && "cash-output-publisher".equals(executor.connectorKey())));
+    }
+
+    @Test
+    void shouldRequireDeliveryRepositoryWhenBuildingExecutors() {
+        assertThrows(NullPointerException.class,
+                () -> PipelineExecutorFactory.createExecutors(null));
     }
 
     private static final class FakeDeliveryRepository
