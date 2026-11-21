@@ -1,7 +1,11 @@
 package com.flowforge.etl.cash.cli;
 
-import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
+import com.flowforge.etl.cash.delivery.CashOutputDeliveryRepository;
+import com.flowforge.etl.cash.delivery.CashOutputPublisherLoader;
 import com.flowforge.etl.cash.delivery.CashOutputRecoveryService;
+import com.flowforge.etl.cash.delivery.LocalFilePublisher;
+import com.flowforge.etl.cash.delivery.SqlServerCashOutputDeliveryRepository;
+import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
 
 /**
  * Retries pending FRONT output deliveries without reloading cash transactions.
@@ -40,8 +44,16 @@ public final class CashOutputRecoveryCli {
                     "SQL Server environment variables are not configured.");
         }
 
+        CashOutputDeliveryRepository repository =
+                new SqlServerCashOutputDeliveryRepository();
+        CashOutputPublisherLoader publisher =
+                new CashOutputPublisherLoader(
+                        repository, new LocalFilePublisher());
+        CashOutputRecoveryService service =
+                new CashOutputRecoveryService(repository, publisher);
+
         CashOutputRecoveryService.RecoveryResult result =
-                new CashOutputRecoveryService().recoverPending();
+                service.recoverPending();
 
         if (result.total() == 0) {
             System.out.println("No pending FRONT output deliveries.");
