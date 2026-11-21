@@ -203,6 +203,56 @@ class CashValidatorTest {
         assertTrue(context.get("valid", List.class).isEmpty());
     }
 
+    @Test
+    void shouldAcceptZeroAndPositiveAmountsAndRejectNegativeAmounts() {
+        var step = step(Map.of(
+                "inputKey", "cash",
+                "validOutputKey", "valid",
+                "rejectedOutputKey", "rejected"
+        ));
+
+        var context = new PipelineExecutionContext();
+        context.put("cash", List.of(
+                cashRecord("100.50"),
+                cashRecord("0"),
+                cashRecord("0.00"),
+                cashRecord("-0.00"),
+                cashRecord("-0.01"),
+                cashRecord("-100")
+        ));
+
+        validator.execute(step, context);
+
+        List<?> valid = context.get("valid", List.class);
+        List<?> rejected = context.get("rejected", List.class);
+
+        assertEquals(4, valid.size());
+        assertEquals(2, rejected.size());
+
+        assertEquals("100.50", ((Map<?, ?>) valid.get(0)).get("amount"));
+        assertEquals("0", ((Map<?, ?>) valid.get(1)).get("amount"));
+        assertEquals("0.00", ((Map<?, ?>) valid.get(2)).get("amount"));
+        assertEquals("-0.00", ((Map<?, ?>) valid.get(3)).get("amount"));
+
+        assertEquals(
+                "Amount must be zero or positive: -0.01",
+                ((Map<?, ?>) rejected.get(0)).get("rejectionReason")
+        );
+        assertEquals(
+                "Amount must be zero or positive: -100",
+                ((Map<?, ?>) rejected.get(1)).get("rejectionReason")
+        );
+    }
+
+    private Map<String, String> cashRecord(String amount) {
+        return Map.of(
+                "accountCode", "ACC001",
+                "adjustmentId", "ADJ001",
+                "currency", "EUR",
+                "amount", amount
+        );
+    }
+
     private PipelineStep step(Map<String, String> properties) {
         return new PipelineStep(
                 "cash-validation",
