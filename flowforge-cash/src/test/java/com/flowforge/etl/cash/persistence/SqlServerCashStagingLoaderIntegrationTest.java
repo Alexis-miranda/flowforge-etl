@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.cash.persistence;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
@@ -32,11 +31,6 @@ class SqlServerCashStagingLoaderIntegrationTest {
         String testId = UUID.randomUUID().toString();
         String accountCode = "TEST-" + testId;
         String sourceFile = "integration-test-" + testId + ".csv";
-
-        String cleanupSql = """
-                DELETE FROM dbo.CashStaging
-                WHERE SourceFile = ?
-                """;
 
         try {
             PipelineExecutionContext context =
@@ -104,13 +98,39 @@ class SqlServerCashStagingLoaderIntegrationTest {
             }
         } finally {
             try (Connection connection =
-                         SqlServerConnectionFactory.openConnection();
-                 PreparedStatement cleanup =
-                         connection.prepareStatement(cleanupSql)) {
-
-                cleanup.setString(1, sourceFile);
-                cleanup.executeUpdate();
+                         SqlServerConnectionFactory.openConnection()) {
+                connection.setAutoCommit(false);
+                try {
+                    deleteBySource(connection, "dbo.T_MASTER_CASH", sourceFile);
+                    deleteBySource(connection, "dbo.CashRejected", sourceFile);
+                    deleteBySource(connection, "dbo.CashStaging", sourceFile);
+                    deleteBySource(connection, "dbo.CashLoadControl", sourceFile);
+                    connection.commit();
+                } catch (Exception exception) {
+                    connection.rollback();
+                    throw exception;
+                }
             }
+        }
+    }
+
+    private void deleteBySource(
+            Connection connection,
+            String table,
+            String sourceFile) throws Exception {
+        if (!List.of(
+                "dbo.T_MASTER_CASH",
+                "dbo.CashRejected",
+                "dbo.CashStaging",
+                "dbo.CashLoadControl"
+        ).contains(table)) {
+            throw new IllegalArgumentException("Unexpected table name");
+        }
+
+        try (PreparedStatement statement = connection.prepareStatement(
+                "DELETE FROM " + table + " WHERE SourceFile = ?")) {
+            statement.setString(1, sourceFile);
+            statement.executeUpdate();
         }
     }
 }
