@@ -57,13 +57,7 @@ public class CashFrontCsvLoader implements StepExecutor {
                 step.configuration().get("timestamp")
         );
 
-        Object input = context.get(inputKey);
-
-        if (!(input instanceof List<?> records)) {
-            throw new IllegalArgumentException(
-                    "Input data must be a list of records: " + inputKey
-            );
-        }
+        List<?> records = context.getRequired(inputKey, List.class);
 
         if (records.isEmpty()) {
             throw new IllegalArgumentException(

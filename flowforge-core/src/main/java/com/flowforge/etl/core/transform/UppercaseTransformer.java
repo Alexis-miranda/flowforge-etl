@@ -47,7 +47,6 @@ public class UppercaseTransformer implements StepExecutor {
         }
 
         Object input = context.get(inputKey);
-
         if (!(input instanceof java.util.List<?> records)) {
             throw new IllegalArgumentException(
                     "Input data must be a list of records: " + inputKey

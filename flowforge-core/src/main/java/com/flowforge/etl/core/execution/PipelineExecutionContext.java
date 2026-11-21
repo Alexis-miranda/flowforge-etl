@@ -69,6 +69,40 @@ public class PipelineExecutionContext {
     }
 
     /**
+     * Retrieves a required value from the execution context and checks its type.
+     *
+     * @param key the data key
+     * @param type the expected value type
+     * @param <T> the expected value type
+     * @return the stored value cast to the expected type
+     * @throws IllegalArgumentException if the key, type, or stored value is invalid,
+     *                                  or no value exists
+     */
+    public <T> T getRequired(String key, Class<T> type) {
+        validateKey(key);
+
+        if (type == null) {
+            throw new IllegalArgumentException(
+                    "Expected type must not be null");
+        }
+
+        Object value = data.get(key);
+
+        if (value == null) {
+            throw new IllegalArgumentException(
+                    "Missing required context value: " + key);
+        }
+
+        if (!type.isInstance(value)) {
+            throw new IllegalArgumentException(
+                    "Context value for key '" + key
+                            + "' must be of type " + type.getSimpleName());
+        }
+
+        return type.cast(value);
+    }
+
+    /**
      * Checks whether the execution context contains the given key.
      *
      * @param key the data key

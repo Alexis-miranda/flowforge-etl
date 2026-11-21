@@ -79,6 +79,37 @@ class PipelineExecutionContextTest {
     }
 
     @Test
+    void shouldRetrieveRequiredValueUsingExpectedType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("name", "FlowForge");
+
+        String name = context.getRequired("name", String.class);
+
+        assertEquals("FlowForge", name);
+    }
+
+    @Test
+    void shouldRejectMissingRequiredValue() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.getRequired("missing", String.class)
+        );
+    }
+
+    @Test
+    void shouldRejectRequiredValueWithIncompatibleType() {
+        PipelineExecutionContext context = new PipelineExecutionContext();
+        context.put("count", 42);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> context.getRequired("count", String.class)
+        );
+    }
+
+    @Test
     void shouldRejectValueWithIncompatibleType() {
         PipelineExecutionContext context = new PipelineExecutionContext();
         context.put("count", 42);
