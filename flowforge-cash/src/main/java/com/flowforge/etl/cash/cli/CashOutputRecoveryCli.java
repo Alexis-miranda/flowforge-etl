@@ -1,21 +1,7 @@
-
 package com.flowforge.etl.cash.cli;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
-import com.flowforge.etl.cash.delivery.CashOutputPublisherLoader;
-
-import com.flowforge.etl.core.domain.PipelineStep;
-import com.flowforge.etl.core.domain.StepConfiguration;
-import com.flowforge.etl.core.domain.StepType;
-import com.flowforge.etl.core.execution.PipelineExecutionContext;
-
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import com.flowforge.etl.cash.delivery.CashOutputRecoveryService;
 
 /**
  * Retries pending FRONT output deliveries without reloading cash transactions.
@@ -48,81 +34,37 @@ public final class CashOutputRecoveryCli {
         }
     }
 
-    static int runRecovery() throws SQLException {
+    static int runRecovery() {
         if (!SqlServerConnectionFactory.isConfigured()) {
             throw new IllegalStateException(
                     "SQL Server environment variables are not configured.");
         }
 
-        List<String> pendingSources = findPendingSources();
+        CashOutputRecoveryService.RecoveryResult result =
+                new CashOutputRecoveryService().recoverPending();
 
-        if (pendingSources.isEmpty()) {
+        if (result.total() == 0) {
             System.out.println("No pending FRONT output deliveries.");
             return 0;
         }
 
         System.out.println(
-                "Found " + pendingSources.size()
+                "Found " + result.total()
                         + " pending FRONT output delivery/deliveries.");
 
-        CashOutputPublisherLoader publisher =
-                new CashOutputPublisherLoader();
+        result.recoveredSources().forEach(sourceFile ->
+                System.out.println("Recovered delivery: " + sourceFile));
 
-        int failures = 0;
-
-        for (String sourceFile : pendingSources) {
-            try {
-                PipelineStep step = new PipelineStep(
-                        "recover-front-output",
-                        "Recover FRONT output",
-                        StepType.LOAD,
-                        1,
-                        new StepConfiguration(Map.of(
-                                "connector", "cash-output-publisher",
-                                "sourceFile", sourceFile
-                        ))
-                );
-
-                publisher.execute(step, new PipelineExecutionContext());
-
-                System.out.println("Recovered delivery: " + sourceFile);
-            } catch (RuntimeException exception) {
-                failures++;
+        result.failures().forEach(failure ->
                 System.err.println(
-                        "Could not recover " + sourceFile + ": "
-                                + exception.getMessage());
-            }
-        }
+                        "Could not recover " + failure.sourceFile() + ": "
+                                + failure.message()));
 
         System.out.println(
-                "Recovery summary: total=" + pendingSources.size()
-                        + ", failed=" + failures
-                        + ", succeeded=" + (pendingSources.size() - failures));
+                "Recovery summary: total=" + result.total()
+                        + ", failed=" + result.failed()
+                        + ", succeeded=" + result.succeeded());
 
-        return failures;
-    }
-
-    private static List<String> findPendingSources() throws SQLException {
-        String sql = """
-                SELECT SourceFile
-                FROM dbo.CashOutputDelivery
-                WHERE DeliveryStatus = N'PENDING'
-                ORDER BY CreatedAt, SourceFile
-                """;
-
-        List<String> sources = new ArrayList<>();
-
-        try (Connection connection =
-                     SqlServerConnectionFactory.openConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(sql);
-             ResultSet result = statement.executeQuery()) {
-
-            while (result.next()) {
-                sources.add(result.getString("SourceFile"));
-            }
-        }
-
-        return sources;
+        return result.failed();
     }
 }
