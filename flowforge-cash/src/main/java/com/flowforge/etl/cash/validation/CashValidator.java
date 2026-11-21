@@ -52,17 +52,7 @@ public class CashValidator implements StepExecutor {
                     "Input and output keys must be different");
         }
 
-        if (!context.contains(inputKey)) {
-            throw new IllegalArgumentException(
-                    "Missing input data in execution context: " + inputKey);
-        }
-
-        Object input = context.get(inputKey);
-
-        if (!(input instanceof List<?> records)) {
-            throw new IllegalArgumentException(
-                    "Input data must be a list of records: " + inputKey);
-        }
+        List<?> records = context.getRequired(inputKey, List.class);
 
         Set<String> currencies = configuredCurrencies(step);
 
