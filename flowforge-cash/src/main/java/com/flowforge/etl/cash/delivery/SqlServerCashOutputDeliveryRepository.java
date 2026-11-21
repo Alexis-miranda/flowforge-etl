@@ -6,12 +6,42 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * SQL Server implementation of the cash output delivery repository.
  */
 public class SqlServerCashOutputDeliveryRepository
         implements CashOutputDeliveryRepository {
+
+    @Override
+    public List<String> findPendingSources() {
+        String sql = """
+                SELECT SourceFile
+                FROM dbo.CashOutputDelivery
+                WHERE DeliveryStatus = N'PENDING'
+                ORDER BY CreatedAt, SourceFile
+                """;
+
+        List<String> sources = new ArrayList<>();
+
+        try (Connection connection =
+                     SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement =
+                     connection.prepareStatement(sql);
+             ResultSet result = statement.executeQuery()) {
+
+            while (result.next()) {
+                sources.add(result.getString("SourceFile"));
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Could not read pending output deliveries", exception);
+        }
+
+        return List.copyOf(sources);
+    }
 
     @Override
     public CashOutputDelivery findBySourceFile(String sourceFile) {
