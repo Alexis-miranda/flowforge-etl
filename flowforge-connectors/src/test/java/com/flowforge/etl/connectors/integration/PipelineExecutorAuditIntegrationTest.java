@@ -1,32 +1,27 @@
-
 package com.flowforge.etl.connectors.integration;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerPipelineExecutionRepository;
 import com.flowforge.etl.core.domain.PipelineDefinition;
 import com.flowforge.etl.core.domain.PipelineStatus;
-import com.flowforge.etl.core.execution.PipelineExecutionResult;
-import com.flowforge.etl.core.execution.PipelineExecutor;
-import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
-import org.junit.jupiter.api.Assumptions;
-import org.junit.jupiter.api.Test;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
+import com.flowforge.etl.core.execution.PipelineExecutionResult;
+import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.PipelineExecutor;
+import org.junit.jupiter.api.Assumptions;
+import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
-
-import java.util.Optional;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class PipelineExecutorAuditIntegrationTest {
 
-
     @Test
-    void shouldPersistFailedExecutionCreatedByFactory() {
+    void shouldPersistFailedExecutionWithoutRegisteredExecutor() {
         Assumptions.assumeTrue(
                 SqlServerConnectionFactory.isConfigured(),
                 "SQL Server environment variables are not configured"
@@ -49,7 +44,11 @@ class PipelineExecutorAuditIntegrationTest {
                 )
         );
 
-        PipelineExecutor executor = PipelineExecutorFactory.create();
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                new SqlServerPipelineExecutionRepository()
+        );
 
         PipelineExecutionResult result = executor.execute(pipeline);
 
@@ -85,7 +84,7 @@ class PipelineExecutorAuditIntegrationTest {
     }
 
     @Test
-    void shouldPersistSuccessfulExecutionCreatedByFactory() {
+    void shouldPersistSuccessfulExecutionWithoutRegisteredSteps() {
         Assumptions.assumeTrue(
                 SqlServerConnectionFactory.isConfigured(),
                 "SQL Server environment variables are not configured"
@@ -96,11 +95,15 @@ class PipelineExecutorAuditIntegrationTest {
         PipelineDefinition pipeline = new PipelineDefinition(
                 pipelineId,
                 "Audit integration test",
-                "Verifies executor factory audit persistence",
+                "Verifies executor audit persistence",
                 List.of()
         );
 
-        PipelineExecutor executor = PipelineExecutorFactory.create();
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(),
+                null,
+                new SqlServerPipelineExecutionRepository()
+        );
 
         PipelineExecutionResult result = executor.execute(pipeline);
 

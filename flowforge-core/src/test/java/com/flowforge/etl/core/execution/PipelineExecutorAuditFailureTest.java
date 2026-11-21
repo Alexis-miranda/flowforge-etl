@@ -26,15 +26,22 @@ class PipelineExecutorAuditFailureTest {
         PipelineExecutor executor = createExecutor(
                 repository, executedSteps);
 
-        assertThrows(
-                IllegalStateException.class,
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
                 () -> executor.execute(emptyStepPipeline()));
 
         assertEquals(0, executedSteps.get());
+        assertEquals(
+                List.of(PipelineExecutionPersistenceException.Operation.START),
+                exception.failures().stream()
+                        .map(PipelineExecutionPersistenceException.Failure::operation)
+                        .toList());
+        assertEquals(AUDIT_ERROR, exception.getCause().getMessage());
+        assertTrue(exception.executionResult().isEmpty());
     }
 
     @Test
-    void shouldPropagateFailureWhenUpdatingFinalAuditFails() {
+    void shouldReportFailureWhenUpdatingFinalAuditFails() {
         AtomicInteger executedSteps = new AtomicInteger();
         PipelineExecutionRepository repository =
                 new FailingRepository(false, true, false);
@@ -42,15 +49,22 @@ class PipelineExecutorAuditFailureTest {
         PipelineExecutor executor = createExecutor(
                 repository, executedSteps);
 
-        assertThrows(
-                IllegalStateException.class,
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
                 () -> executor.execute(emptyStepPipeline()));
 
         assertEquals(1, executedSteps.get());
+        assertEquals(
+                List.of(PipelineExecutionPersistenceException.Operation.UPDATE),
+                exception.failures().stream()
+                        .map(PipelineExecutionPersistenceException.Failure::operation)
+                        .toList());
+        assertEquals(AUDIT_ERROR, exception.getCause().getMessage());
+        assertTrue(exception.executionResult().isPresent());
     }
 
     @Test
-    void shouldPropagateFailureWhenSavingFinalAuditFails() {
+    void shouldReportFailureWhenSavingFinalAuditFails() {
         AtomicInteger executedSteps = new AtomicInteger();
         PipelineExecutionRepository repository =
                 new FailingRepository(false, false, true);
@@ -58,11 +72,18 @@ class PipelineExecutorAuditFailureTest {
         PipelineExecutor executor = createExecutor(
                 repository, executedSteps);
 
-        assertThrows(
-                IllegalStateException.class,
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
                 () -> executor.execute(emptyStepPipeline()));
 
         assertEquals(1, executedSteps.get());
+        assertEquals(
+                List.of(PipelineExecutionPersistenceException.Operation.SAVE),
+                exception.failures().stream()
+                        .map(PipelineExecutionPersistenceException.Failure::operation)
+                        .toList());
+        assertEquals(AUDIT_ERROR, exception.getCause().getMessage());
+        assertTrue(exception.executionResult().isPresent());
     }
 
     private PipelineExecutor createExecutor(
@@ -149,6 +170,7 @@ class PipelineExecutorAuditFailureTest {
         findSnapshotsByPipelineId(String pipelineId) {
             return List.of();
         }
+
         @Override
         public List<PipelineExecutionResult>
         findByPipelineId(String pipelineId) {

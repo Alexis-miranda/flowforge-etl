@@ -67,14 +67,7 @@ public class UppercaseTransformer implements StepExecutor {
             java.util.Map<String, String> transformedRow =
                     new java.util.LinkedHashMap<>();
 
-            for (java.util.Map.Entry<?, ?> entry : row.entrySet()) {
-                if (!(entry.getKey() instanceof String key)
-                        || !(entry.getValue() instanceof String value)) {
-                    throw new IllegalArgumentException(
-                            "Record keys and values must be strings"
-                    );
-                }
-
+            RecordMapper.forEachStringEntry(row, (key, value) -> {
                 if (key.equals(column)) {
                     transformedRow.put(
                             key,
@@ -83,7 +76,7 @@ public class UppercaseTransformer implements StepExecutor {
                 } else {
                     transformedRow.put(key, value);
                 }
-            }
+            });
 
             if (!transformedRow.containsKey(column)) {
                 throw new IllegalArgumentException(

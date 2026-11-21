@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 600" role="img" aria-labelledby="title desc">
+  <title id="title">FlowForge ETL</title>
+  <desc id="desc">Blueprint-inspired data network mark with connected extraction, transformation and loading nodes.</desc>
+  <defs>
+    <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+      <path d="M32 0H0V32" fill="none" stroke="#24445F" stroke-width="1" opacity=".42"/>
+    </pattern>
+    <linearGradient id="glow" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#42DDF2"/>
+      <stop offset="1" stop-color="#4B91FF"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="600" rx="34" fill="#091B30"/>
+  <rect width="1200" height="600" rx="34" fill="url(#grid)"/>
+  <g transform="translate(95 105)" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M52 195 145 72h145l93 123-93 123H145Z" stroke="#2A5875" stroke-width="2" stroke-dasharray="5 10"/>
+    <path d="M52 195h92l69-92h77l93 92h90" stroke="url(#glow)" stroke-width="5"/>
+    <path d="M144 195 211 288h77l70-93M211 103v185M288 103v185" stroke="#3BCBE8" stroke-width="3" opacity=".85"/>
+    <path d="M144 195h144M288 195h93" stroke="#7CEBFA" stroke-width="3"/>
+    <path d="M371 195h62" stroke="#4B91FF" stroke-width="5"/>
+    <g fill="#091B30" stroke="#56E0F4" stroke-width="5">
+      <circle cx="52" cy="195" r="12"/><circle cx="144" cy="195" r="12"/>
+      <circle cx="211" cy="103" r="12"/><circle cx="211" cy="288" r="12"/>
+      <circle cx="288" cy="103" r="12"/><circle cx="288" cy="288" r="12"/>
+      <circle cx="371" cy="195" r="14"/>
+    </g>
+    <circle cx="371" cy="195" r="5" fill="#F4FCFF" stroke="none"/>
+    <g stroke="#5B91B7" stroke-width="1.5" opacity=".7">
+      <path d="M52 145v-28h36M144 245v33h-34M288 63V38h32M371 245v30h34"/>
+      <path d="M22 195h-18M433 195h25"/>
+    </g>
+    <g fill="#9BC8DF" font-family="Arial, sans-serif" font-size="13" letter-spacing="2">
+      <text x="34" y="105">INPUT</text><text x="177" y="30">PROCESS</text><text x="376" y="305">OUTPUT</text>
+    </g>
+  </g>
+  <g transform="translate(600 0)">
+    <text x="0" y="275" fill="#F4FAFF" font-family="Arial, Helvetica, sans-serif" font-size="76" font-weight="700" letter-spacing="2">FLOWFORGE</text>
+    <text x="4" y="350" fill="#4DDCF2" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="600" letter-spacing="13">ETL</text>
+    <path d="M4 390h460" stroke="#2C526D" stroke-width="2"/>
+    <text x="4" y="430" fill="#91B6CC" font-family="Arial, Helvetica, sans-serif" font-size="18" letter-spacing="4">DATA PIPELINE FRAMEWORK</text>
+    <g fill="#48D8EE">
+      <circle cx="4" cy="475" r="4"/><circle cx="28" cy="475" r="4"/><circle cx="52" cy="475" r="4"/>
+    </g>
+  </g>
+</svg>

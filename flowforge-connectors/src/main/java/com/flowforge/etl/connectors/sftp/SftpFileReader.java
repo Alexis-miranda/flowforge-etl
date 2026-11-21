@@ -1,7 +1,4 @@
-
 package com.flowforge.etl.connectors.sftp;
-
-import org.apache.sshd.sftp.client.SftpClient;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,6 +27,10 @@ public final class SftpFileReader {
              OutputStream output = Files.newOutputStream(localPath)) {
 
             input.transferTo(output);
+        } catch (IOException exception) {
+            throw SftpFailureClassifier.toStepExecutionFailure(
+                    "Failed to download remote SFTP file: " + remotePath,
+                    exception);
         }
     }
 }

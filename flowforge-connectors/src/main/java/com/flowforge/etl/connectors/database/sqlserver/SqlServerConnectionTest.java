@@ -1,5 +1,7 @@
 package com.flowforge.etl.connectors.database.sqlserver;
 
+import com.flowforge.etl.core.execution.StepExecutionFailureException;
+
 import java.sql.Connection;
 import java.sql.SQLException;
 
@@ -17,7 +19,7 @@ public class SqlServerConnectionTest {
         try (Connection connection = SqlServerConnectionFactory.openConnection()) {
             System.out.println("SQL Server connection successful.");
             System.out.println("Database: " + connection.getCatalog());
-        } catch (SQLException | IllegalStateException exception) {
+        } catch (SQLException | StepExecutionFailureException exception) {
             // Do not print the exception message: drivers may include connection details.
             System.err.println("Could not connect to SQL Server. Check configuration and logs.");
         }

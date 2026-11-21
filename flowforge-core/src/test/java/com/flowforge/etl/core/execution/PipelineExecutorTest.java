@@ -12,6 +12,7 @@ import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -78,6 +79,44 @@ class PipelineExecutorTest {
                 "No executor registered for step type: EXTRACT",
                 result.errorMessage()
         );
+        assertEquals(1, result.stepHistory().size());
+        StepExecutionRecord failedStep = result.stepHistory().get(0);
+        assertEquals(StepExecutionStatus.FAILED, failedStep.status());
+        assertNotNull(failedStep.startedAt());
+        assertNotNull(failedStep.finishedAt());
+        assertEquals(IllegalStateException.class.getName(),
+                failedStep.exceptionType());
+        assertEquals(FailureClassification.UNCLASSIFIED,
+                failedStep.failureClassification());
+    }
+
+    @Test
+    void shouldRecordExplicitFailureClassifications() {
+        for (FailureClassification classification : FailureClassification.values()) {
+            StepExecutor failingExecutor = new StepExecutor() {
+                @Override
+                public StepType supportedType() {
+                    return StepType.EXTRACT;
+                }
+
+                @Override
+                public void execute(
+                        PipelineStep step,
+                        PipelineExecutionContext context) {
+                    throw new StepExecutionFailureException(
+                            classification, "Classified failure");
+                }
+            };
+
+            PipelineExecutor executor = new PipelineExecutor(
+                    List.of(failingExecutor));
+            PipelineExecutionResult result = executor.execute(createPipeline(List.of(
+                    createStep("extract", StepType.EXTRACT, 1))));
+
+            assertEquals(PipelineStatus.FAILED, result.status());
+            assertEquals(classification,
+                    result.stepHistory().get(0).failureClassification());
+        }
     }
 
     @Test
@@ -830,6 +869,338 @@ class PipelineExecutorTest {
 
 
 
+
+    @Test
+    void shouldRecordSuccessfulFailedAndSkippedStepsWithCause() {
+        List<String> executedSteps = new ArrayList<>();
+        StepExecutor extract = createExecutor(StepType.EXTRACT, executedSteps);
+        StepExecutor failingTransform = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.TRANSFORM;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                executedSteps.add(step.id());
+                throw new IllegalStateException(
+                        "Transformation failed",
+                        new IllegalArgumentException("Invalid input data"));
+            }
+        };
+        StepExecutor load = createExecutor(StepType.LOAD, executedSteps);
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(extract, failingTransform, load));
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1),
+                createStep("transform", StepType.TRANSFORM, 2),
+                createStep("load", StepType.LOAD, 3)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.FAILED, result.status());
+        assertEquals(List.of("extract", "transform"), executedSteps);
+        assertEquals(3, result.stepHistory().size());
+
+        StepExecutionRecord first = result.stepHistory().get(0);
+        assertEquals("extract", first.stepId());
+        assertEquals(StepExecutionStatus.SUCCEEDED, first.status());
+        assertNotNull(first.startedAt());
+        assertNotNull(first.finishedAt());
+
+        StepExecutionRecord failed = result.stepHistory().get(1);
+        assertEquals("transform", failed.stepId());
+        assertEquals(StepExecutionStatus.FAILED, failed.status());
+        assertEquals(IllegalStateException.class.getName(), failed.exceptionType());
+        assertEquals("Transformation failed", failed.errorMessage());
+        assertEquals(IllegalArgumentException.class.getName(), failed.causeType());
+        assertEquals("Invalid input data", failed.causeMessage());
+
+        StepExecutionRecord skipped = result.stepHistory().get(2);
+        assertEquals("load", skipped.stepId());
+        assertEquals(StepExecutionStatus.SKIPPED, skipped.status());
+        assertEquals(
+                "Not executed because step 'transform' failed",
+                skipped.skipReason());
+        assertNull(skipped.startedAt());
+        assertNotNull(skipped.finishedAt());
+        assertEquals(
+                "Not executed because step 'transform' failed",
+                skipped.skipReason());
+    }
+
+    @Test
+    void shouldReturnStepHistoryForSuccessfulPipeline() {
+        List<String> executedSteps = new ArrayList<>();
+        PipelineExecutor executor = new PipelineExecutor(List.of(
+                createExecutor(StepType.EXTRACT, executedSteps),
+                createExecutor(StepType.LOAD, executedSteps)));
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1),
+                createStep("load", StepType.LOAD, 2)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(2, result.stepHistory().size());
+        assertTrue(result.stepHistory().stream()
+                .allMatch(record -> record.status() == StepExecutionStatus.SUCCEEDED));
+    }
+
+    @Test
+    void shouldPersistStepHistoryInExecutionRepository() {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.TRANSFORM;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                throw new IllegalArgumentException("Invalid transformation");
+            }
+        };
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor), null, repository);
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("transform", StepType.TRANSFORM, 1),
+                createStep("load", StepType.LOAD, 2)));
+
+        PipelineExecutionResult result = executor.execute(pipeline);
+        PipelineExecutionResult persisted = repository
+                .findByExecutionId(result.executionId())
+                .orElseThrow();
+
+        assertEquals(result.stepHistory(), persisted.stepHistory());
+        assertEquals(StepExecutionStatus.FAILED, persisted.stepHistory().get(0).status());
+        assertEquals(StepExecutionStatus.SKIPPED, persisted.stepHistory().get(1).status());
+    }
+
+
+    @Test
+    void shouldNotExecutePipelineWhenInitialAuditPersistenceFails() {
+        List<String> executedSteps = new ArrayList<>();
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        PipelineExecutionPersistenceException.Operation.START);
+
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(createExecutor(StepType.EXTRACT, executedSteps)),
+                null,
+                repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of(
+                        createStep("extract", StepType.EXTRACT, 1)))));
+
+        assertTrue(executedSteps.isEmpty());
+        assertEquals("test-pipeline", exception.pipelineId());
+        assertEquals(1, exception.failures().size());
+        assertEquals(
+                PipelineExecutionPersistenceException.Operation.START,
+                exception.failures().get(0).operation());
+        assertTrue(exception.executionResult().isEmpty());
+    }
+
+    @Test
+    void shouldSaveResultEvenWhenFinalSnapshotUpdateFails() {
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        PipelineExecutionPersistenceException.Operation.UPDATE);
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(), null, repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of())));
+
+        PipelineExecutionResult result =
+                exception.executionResult().orElseThrow();
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(1, exception.failures().size());
+        assertEquals(
+                PipelineExecutionPersistenceException.Operation.UPDATE,
+                exception.failures().get(0).operation());
+        assertTrue(repository.delegate.findByExecutionId(result.executionId()).isPresent());
+    }
+
+    @Test
+    void shouldRetainResultWhenSavingFinalResultFails() {
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        PipelineExecutionPersistenceException.Operation.SAVE);
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(), null, repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of())));
+
+        PipelineExecutionResult result =
+                exception.executionResult().orElseThrow();
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+        assertEquals(1, exception.failures().size());
+        assertEquals(
+                PipelineExecutionPersistenceException.Operation.SAVE,
+                exception.failures().get(0).operation());
+        assertEquals(
+                PipelineStatus.SUCCEEDED,
+                repository.delegate
+                        .findSnapshotByExecutionId(result.executionId())
+                        .orElseThrow()
+                        .status());
+        assertTrue(repository.delegate.findByExecutionId(result.executionId()).isEmpty());
+    }
+
+    @Test
+    void shouldReportBothFinalPersistenceFailuresWithoutLosingPipelineResult() {
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        Set.of(
+                                PipelineExecutionPersistenceException.Operation.UPDATE,
+                                PipelineExecutionPersistenceException.Operation.SAVE));
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(), null, repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of())));
+
+        assertEquals(
+                List.of(
+                        PipelineExecutionPersistenceException.Operation.UPDATE,
+                        PipelineExecutionPersistenceException.Operation.SAVE),
+                exception.failures().stream()
+                        .map(PipelineExecutionPersistenceException.Failure::operation)
+                        .toList());
+        assertEquals(1, exception.getSuppressed().length);
+        assertEquals(
+                PipelineStatus.SUCCEEDED,
+                exception.executionResult().orElseThrow().status());
+    }
+
+
+    @Test
+    void shouldPreservePipelineFailureWhenAuditResultPersistenceAlsoFails() {
+        FaultInjectingExecutionRepository repository =
+                new FaultInjectingExecutionRepository(
+                        PipelineExecutionPersistenceException.Operation.SAVE);
+        StepExecutor failingExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(
+                    PipelineStep step,
+                    PipelineExecutionContext context) {
+                throw new IllegalStateException("Original ETL failure");
+            }
+        };
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(failingExecutor), null, repository);
+
+        PipelineExecutionPersistenceException exception = assertThrows(
+                PipelineExecutionPersistenceException.class,
+                () -> executor.execute(createPipeline(List.of(
+                        createStep("extract", StepType.EXTRACT, 1)))));
+
+        PipelineExecutionResult originalResult =
+                exception.executionResult().orElseThrow();
+        assertEquals(PipelineStatus.FAILED, originalResult.status());
+        assertEquals("extract", originalResult.failedStepId());
+        assertEquals("Original ETL failure", originalResult.errorMessage());
+        assertEquals(
+                StepExecutionStatus.FAILED,
+                originalResult.stepHistory().get(0).status());
+        assertEquals(
+                PipelineExecutionPersistenceException.Operation.SAVE,
+                exception.failures().get(0).operation());
+        assertEquals(
+                "Simulated repository failure during SAVE",
+                exception.getCause().getMessage());
+    }
+
+    private static final class FaultInjectingExecutionRepository
+            implements PipelineExecutionRepository {
+
+        private final InMemoryPipelineExecutionRepository delegate =
+                new InMemoryPipelineExecutionRepository();
+        private final Set<PipelineExecutionPersistenceException.Operation>
+                failingOperations;
+
+        private FaultInjectingExecutionRepository(
+                PipelineExecutionPersistenceException.Operation operation) {
+            this(Set.of(operation));
+        }
+
+        private FaultInjectingExecutionRepository(
+                Set<PipelineExecutionPersistenceException.Operation> operations) {
+            this.failingOperations = Set.copyOf(operations);
+        }
+
+        @Override
+        public void start(PipelineExecutionSnapshot snapshot) {
+            failIfConfigured(
+                    PipelineExecutionPersistenceException.Operation.START);
+            delegate.start(snapshot);
+        }
+
+        @Override
+        public void update(PipelineExecutionSnapshot snapshot) {
+            failIfConfigured(
+                    PipelineExecutionPersistenceException.Operation.UPDATE);
+            delegate.update(snapshot);
+        }
+
+        @Override
+        public void save(PipelineExecutionResult result) {
+            failIfConfigured(
+                    PipelineExecutionPersistenceException.Operation.SAVE);
+            delegate.save(result);
+        }
+
+        @Override
+        public java.util.Optional<PipelineExecutionSnapshot>
+        findSnapshotByExecutionId(String executionId) {
+            return delegate.findSnapshotByExecutionId(executionId);
+        }
+
+        @Override
+        public List<PipelineExecutionResult> findByPipelineId(String pipelineId) {
+            return delegate.findByPipelineId(pipelineId);
+        }
+
+        @Override
+        public java.util.Optional<PipelineExecutionResult>
+        findByExecutionId(String executionId) {
+            return delegate.findByExecutionId(executionId);
+        }
+
+        @Override
+        public List<PipelineExecutionSnapshot> findSnapshotsByPipelineId(
+                String pipelineId) {
+            return delegate.findSnapshotsByPipelineId(pipelineId);
+        }
+
+        private void failIfConfigured(
+                PipelineExecutionPersistenceException.Operation operation) {
+            if (failingOperations.contains(operation)) {
+                throw new IllegalStateException(
+                        "Simulated repository failure during " + operation);
+            }
+        }
+    }
 
     private StepExecutor createExecutorWithConnector(
             StepType type,

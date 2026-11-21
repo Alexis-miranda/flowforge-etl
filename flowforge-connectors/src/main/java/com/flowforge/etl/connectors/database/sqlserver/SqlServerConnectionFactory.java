@@ -1,5 +1,8 @@
 package com.flowforge.etl.connectors.database.sqlserver;
 
+import com.flowforge.etl.core.execution.FailureClassification;
+import com.flowforge.etl.core.execution.StepExecutionFailureException;
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
@@ -30,7 +33,8 @@ public final class SqlServerConnectionFactory {
     private static String requiredEnvironmentVariable(String name) {
         String value = System.getenv(name);
         if (value == null || value.isBlank()) {
-            throw new IllegalStateException(
+            throw new StepExecutionFailureException(
+                    FailureClassification.REQUIRES_HUMAN_INTERVENTION,
                     "Missing required environment variable: " + name);
         }
         return value;

@@ -1,0 +1,99 @@
+name: Maven verification
+
+on:
+  push:
+    branches:
+      - main
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maven-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify (Java 21 + SQL Server)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: "Y"
+          MSSQL_PID: Developer
+          MSSQL_SA_PASSWORD: "FlowForge_CI_2026!Strong"
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P 'FlowForge_CI_2026!Strong' -C -Q 'SELECT 1' || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      MSSQL_SA_PASSWORD: "FlowForge_CI_2026!Strong"
+      FLOWFORGE_DB_JDBC_URL: "jdbc:sqlserver://localhost:1433;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true"
+      FLOWFORGE_DB_USER: sa
+      FLOWFORGE_DB_PASSWORD: "FlowForge_CI_2026!Strong"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+
+      - name: Initialize SQL Server schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          container_id="$(docker ps -q --filter 'name=sqlserver' | head -n 1)"
+          if [ -z "$container_id" ]; then
+            echo "SQL Server service container was not found."
+            exit 1
+          fi
+
+          ready=0
+          for attempt in $(seq 1 30); do
+            if docker exec "$container_id" /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -Q "SELECT 1" >/dev/null 2>&1; then
+              ready=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$ready" -ne 1 ]; then
+            echo "SQL Server did not become ready."
+            exit 1
+          fi
+
+          docker exec "$container_id" /opt/mssql-tools18/bin/sqlcmd \
+            -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C -b \
+            -Q "IF DB_ID(N'FlowForgeETL_Dev') IS NULL CREATE DATABASE FlowForgeETL_Dev;"
+
+          for script in \
+            docs/cash/sql/01-cash-staging-schema.sql \
+            docs/cash/sql/03-cash-rejected-schema.sql \
+            docs/cash/sql/04-cash-master-audit-schema.sql \
+            docs/cash/sql/05-cash-load-control-schema.sql \
+            docs/cash/sql/06-cash-output-delivery-schema.sql \
+            docs/cash/sql/07-etl-execution-schema.sql; do
+            file_name="$(basename "$script")"
+            docker cp "$script" "$container_id:/tmp/$file_name"
+            docker exec "$container_id" /opt/mssql-tools18/bin/sqlcmd \
+              -S localhost -U sa -P "$MSSQL_SA_PASSWORD" -C \
+              -d FlowForgeETL_Dev -b -i "/tmp/$file_name"
+          done
+
+      - name: Build and run all tests
+        run: mvn --batch-mode --no-transfer-progress clean verify
