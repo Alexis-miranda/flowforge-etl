@@ -6,6 +6,7 @@ import com.flowforge.etl.core.execution.PipelineExecutionContext;
 import com.flowforge.etl.core.execution.StepExecutor;
 
 import java.nio.file.Path;
+import java.util.Objects;
 
 /**
  * Coordinates publication of a persisted cash output delivery.
@@ -16,15 +17,6 @@ public class CashOutputPublisherLoader implements StepExecutor {
     private final LocalFilePublisher filePublisher;
 
     /**
-     * Creates the production publisher with SQL Server and local filesystem
-     * adapters.
-     */
-    public CashOutputPublisherLoader() {
-        this(new SqlServerCashOutputDeliveryRepository(),
-                new LocalFilePublisher());
-    }
-
-    /**
      * Creates a publisher with explicit collaborators.
      * The constructor also allows the orchestration behavior to be tested
      * without requiring a live SQL Server instance.
@@ -32,8 +24,10 @@ public class CashOutputPublisherLoader implements StepExecutor {
     public CashOutputPublisherLoader(
             CashOutputDeliveryRepository deliveryRepository,
             LocalFilePublisher filePublisher) {
-        this.deliveryRepository = deliveryRepository;
-        this.filePublisher = filePublisher;
+        this.deliveryRepository = Objects.requireNonNull(
+                deliveryRepository, "deliveryRepository must not be null");
+        this.filePublisher = Objects.requireNonNull(
+                filePublisher, "filePublisher must not be null");
     }
 
     @Override
