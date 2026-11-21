@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -169,6 +170,11 @@ class CashOutputPublisherLoaderTest {
 
         private FakeRepository(CashOutputDelivery delivery) {
             this.delivery = delivery;
+        }
+
+        @Override
+        public List<String> findPendingSources() {
+            return List.of();
         }
 
         @Override
