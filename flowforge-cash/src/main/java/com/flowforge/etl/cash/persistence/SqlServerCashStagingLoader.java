@@ -136,13 +136,9 @@ public class SqlServerCashStagingLoader implements StepExecutor {
                 }
 
                 // Persist the prepared FRONT delivery in the same transaction.
-                Object deliveryPayloadValue = context.get("cashFrontPayload");
+                byte[] payload = context.get("cashFrontPayload", byte[].class);
 
-                if (deliveryPayloadValue != null) {
-                    if (!(deliveryPayloadValue instanceof byte[] payload)) {
-                        throw new IllegalArgumentException(
-                                "cashFrontPayload must contain CSV bytes");
-                    }
+                if (payload != null) {
 
                     String deliveryBackOffice = contextValue(
                             context, "cashFrontBackOfficeCode");
@@ -209,9 +205,9 @@ public class SqlServerCashStagingLoader implements StepExecutor {
     private String contextValue(
             PipelineExecutionContext context,
             String key) {
-        Object value = context.get(key);
+        String text = context.getRequired(key, String.class);
 
-        if (!(value instanceof String text) || text.isBlank()) {
+        if (text.isBlank()) {
             throw new IllegalArgumentException(
                     "Missing or invalid context value: " + key);
         }
@@ -428,14 +424,7 @@ public class SqlServerCashStagingLoader implements StepExecutor {
             PipelineExecutionContext context,
             String key) {
 
-        Object value = context.get(key);
-
-        if (!(value instanceof List<?> rows)) {
-            throw new IllegalArgumentException(
-                    "Context key '" + key + "' must contain a list of rows");
-        }
-
-        return rows;
+        return context.getRequired(key, List.class);
     }
 
     private Map<?, ?> requireRow(Object row) {
