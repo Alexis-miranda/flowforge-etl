@@ -75,8 +75,8 @@ public class PipelineExecutionContext {
      * @param type the expected value type
      * @param <T> the expected value type
      * @return the stored value cast to the expected type
-     * @throws IllegalArgumentException if the key is invalid or no value exists
-     * @throws ClassCastException if the stored value has an incompatible type
+     * @throws IllegalArgumentException if the key, type, or stored value is invalid,
+     *                                  or no value exists
      */
     public <T> T getRequired(String key, Class<T> type) {
         validateKey(key);
