@@ -1,9 +1,13 @@
 package com.flowforge.etl.cash.delivery;
 
+import java.util.List;
+
 /**
- * Persistence operations required by the cash output publisher.
+ * Persistence operations required by cash output delivery workflows.
  */
 public interface CashOutputDeliveryRepository {
+
+    List<String> findPendingSources();
 
     CashOutputDelivery findBySourceFile(String sourceFile);
 
