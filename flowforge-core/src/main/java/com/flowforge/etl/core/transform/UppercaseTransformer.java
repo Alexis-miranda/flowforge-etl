@@ -40,7 +40,18 @@ public class UppercaseTransformer implements StepExecutor {
         String outputKey = getRequiredProperty(step, "outputKey");
         String column = getRequiredProperty(step, "column");
 
-        java.util.List<?> records = context.getRequired(inputKey, java.util.List.class);
+        if (!context.contains(inputKey)) {
+            throw new IllegalArgumentException(
+                    "Missing input data in execution context: " + inputKey
+            );
+        }
+
+        Object input = context.get(inputKey);
+        if (!(input instanceof java.util.List<?> records)) {
+            throw new IllegalArgumentException(
+                    "Input data must be a list of records: " + inputKey
+            );
+        }
 
         java.util.List<java.util.Map<String, String>> transformedRecords =
                 new java.util.ArrayList<>();
