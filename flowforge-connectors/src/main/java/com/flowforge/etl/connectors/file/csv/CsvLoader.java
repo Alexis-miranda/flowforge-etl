@@ -64,7 +64,12 @@ public class CsvLoader implements StepExecutor {
         String delimiterValue = step.configuration().get(DELIMITER_PROPERTY);
         char delimiter = resolveDelimiter(delimiterValue);
 
-        List<?> records = context.getRequired(inputKey, List.class);
+        Object inputData = context.get(inputKey);
+        if (!(inputData instanceof List<?> records)) {
+            throw new IllegalArgumentException(
+                    "Input data must be a list of records: " + inputKey
+            );
+        }
 
         writeCsv(filePath, records, delimiter);
     }
