@@ -79,14 +79,27 @@ public class PipelineExecutionContext {
      * @throws ClassCastException if the stored value has an incompatible type
      */
     public <T> T getRequired(String key, Class<T> type) {
-        T value = get(key, type);
+        validateKey(key);
+
+        if (type == null) {
+            throw new IllegalArgumentException(
+                    "Expected type must not be null");
+        }
+
+        Object value = data.get(key);
 
         if (value == null) {
             throw new IllegalArgumentException(
                     "Missing required context value: " + key);
         }
 
-        return value;
+        if (!type.isInstance(value)) {
+            throw new IllegalArgumentException(
+                    "Context value for key '" + key
+                            + "' must be of type " + type.getSimpleName());
+        }
+
+        return type.cast(value);
     }
 
     /**
