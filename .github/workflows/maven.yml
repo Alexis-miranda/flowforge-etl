@@ -1,4 +1,4 @@
-name: Maven tests
+name: Maven verification
 
 on:
   push:
@@ -13,10 +13,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: maven-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
-    name: Build and test (Java 21)
+  verify:
+    name: Verify (Java 21)
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -28,5 +33,5 @@ jobs:
           java-version: "21"
           cache: maven
 
-      - name: Run Maven tests
-        run: mvn --batch-mode --no-transfer-progress -pl flowforge-cash -am test
+      - name: Build and run all tests
+        run: mvn --batch-mode --no-transfer-progress clean verify
