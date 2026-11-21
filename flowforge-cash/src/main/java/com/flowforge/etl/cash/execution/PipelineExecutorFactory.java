@@ -9,7 +9,10 @@ import com.flowforge.etl.cash.validation.CashValidator;
 import com.flowforge.etl.cash.persistence.SqlServerCashStagingLoader;
 import com.flowforge.etl.cash.delivery.CashFrontCsvLoader;
 import com.flowforge.etl.cash.delivery.CashFrontCsvPrepareLoader;
+import com.flowforge.etl.cash.delivery.CashOutputDeliveryRepository;
 import com.flowforge.etl.cash.delivery.CashOutputPublisherLoader;
+import com.flowforge.etl.cash.delivery.LocalFilePublisher;
+import com.flowforge.etl.cash.delivery.SqlServerCashOutputDeliveryRepository;
 import com.flowforge.etl.core.execution.PipelineExecutor;
 import com.flowforge.etl.core.execution.PipelineExecutionListener;
 import com.flowforge.etl.core.execution.StepExecutor;
@@ -37,6 +40,15 @@ public final class PipelineExecutorFactory {
             PipelineExecutionListener listener,
             PipelineExecutionRepository repository
     ) {
+        CashOutputDeliveryRepository deliveryRepository =
+                new SqlServerCashOutputDeliveryRepository();
+
+        return new PipelineExecutor(
+                createExecutors(deliveryRepository), listener, repository);
+    }
+
+    static List<StepExecutor> createExecutors(
+            CashOutputDeliveryRepository deliveryRepository) {
         List<StepExecutor> executors = List.of(
                 new CsvExtractor(),
                 new CashValidator(),
@@ -45,10 +57,11 @@ public final class PipelineExecutorFactory {
                 new CsvLoader(),
                 new CashFrontCsvLoader(),
                 new CashFrontCsvPrepareLoader(),
-                new CashOutputPublisherLoader(),
+                new CashOutputPublisherLoader(
+                        deliveryRepository, new LocalFilePublisher()),
                 new SqlServerCashStagingLoader()
         );
 
-        return new PipelineExecutor(executors, listener, repository);
+        return executors;
     }
 }
