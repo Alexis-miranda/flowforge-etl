@@ -88,13 +88,16 @@ public final class RabbitMqPipelineExecutionRequestConsumer implements AutoClose
 
         try {
             handler.handle(request);
-            channel.basicAck(deliveryTag, false);
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             channel.basicNack(deliveryTag, false, true);
+            return;
         } catch (Exception processingFailure) {
             channel.basicNack(deliveryTag, false, true);
+            return;
         }
+
+        channel.basicAck(deliveryTag, false);
     }
 
     /** Cancels this consumer without closing the caller-owned channel. */
