@@ -30,14 +30,14 @@ export function ExecutionsTable({
       <div className="run-toolbar">
         <div className="tabs">
           {(['All runs', 'Succeeded', 'Running', 'Failed'] satisfies ExecutionFilter[]).map((tab) => (
-            <button key={tab} className={filter === tab ? 'chosen' : ''} onClick={() => onFilterChange(tab)}>
+            <button key={tab} className={filter === tab ? 'chosen' : ''} aria-pressed={filter === tab} onClick={() => onFilterChange(tab)}>
               {tab}
             </button>
           ))}
         </div>
         <div className="search">
           <Search size={15} />
-          <input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search executions..." />
+          <input aria-label="Search executions" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Search executions..." />
         </div>
         <button className="filter-btn"><Filter size={15} /> Filters</button>
       </div>
