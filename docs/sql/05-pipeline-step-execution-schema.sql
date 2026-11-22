@@ -2,7 +2,7 @@ IF OBJECT_ID(N'dbo.ETLStepExecution', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ETLStepExecution
     (
-        ExecutionId VARCHAR(36) NOT NULL,
+        ExecutionId NVARCHAR(36) NOT NULL,
         StepId NVARCHAR(200) NOT NULL,
         StepName NVARCHAR(500) NOT NULL,
         Status VARCHAR(20) NOT NULL,
