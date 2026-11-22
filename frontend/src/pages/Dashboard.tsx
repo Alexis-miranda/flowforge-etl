@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp,
-  Clock3, Database, FileClock, LayoutDashboard, Menu,
+  Clock3, Database, FileClock, LayoutDashboard,
   Plus, Settings2, ShieldCheck, Sparkles, Workflow
 } from 'lucide-react';
 import { Metric } from '../components/Metric';
