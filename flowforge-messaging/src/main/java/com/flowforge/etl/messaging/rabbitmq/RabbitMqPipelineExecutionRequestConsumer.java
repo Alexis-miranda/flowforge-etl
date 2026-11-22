@@ -4,7 +4,6 @@ import com.flowforge.etl.messaging.consumer.NonRetryablePipelineExecutionRequest
 import com.flowforge.etl.messaging.consumer.PipelineExecutionRequestHandler;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestJsonCodec;
-import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestSerializationException;
 import com.rabbitmq.client.AMQP;
 import com.rabbitmq.client.CancelCallback;
 import com.rabbitmq.client.Channel;
@@ -71,6 +70,12 @@ public final class RabbitMqPipelineExecutionRequestConsumer implements AutoClose
         if (prefetchCount < 1) {
             throw new IllegalArgumentException("Prefetch count must be greater than zero");
         }
+        if (retryPolicy != null
+                && (queue.equals(retryPolicy.retryQueue())
+                || queue.equals(retryPolicy.deadLetterQueue()))) {
+            throw new IllegalArgumentException(
+                    "Main, retry, and dead-letter queues must have different names");
+        }
         this.queue = queue;
         this.prefetchCount = prefetchCount;
         this.retryPolicy = retryPolicy;
@@ -100,7 +105,7 @@ public final class RabbitMqPipelineExecutionRequestConsumer implements AutoClose
         final PipelineExecutionRequest request;
         try {
             request = codec.deserialize(delivery.getBody());
-        } catch (PipelineExecutionRequestSerializationException malformedMessage) {
+        } catch (RuntimeException malformedMessage) {
             routeToDeadLetterOrReject(deliveryTag, delivery);
             return;
         }
