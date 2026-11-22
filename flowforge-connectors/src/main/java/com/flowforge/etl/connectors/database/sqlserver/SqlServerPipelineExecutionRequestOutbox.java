@@ -12,7 +12,6 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -73,7 +72,7 @@ public final class SqlServerPipelineExecutionRequestOutbox
             } catch (SQLException exception) {
                 rollback(connection, exception);
                 if (isDuplicateKey(exception)) {
-                    verifyIdenticalExistingRequest(executionId, payload);
+                    verifyIdenticalExistingRequest(executionId, request);
                     return;
                 }
                 throw new IllegalStateException(
@@ -88,7 +87,7 @@ public final class SqlServerPipelineExecutionRequestOutbox
     }
 
     private static void verifyIdenticalExistingRequest(
-            String executionId, byte[] expectedPayload) {
+            String executionId, PipelineExecutionRequest expectedRequest) {
         try (Connection connection = SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      SELECT Payload
@@ -98,7 +97,9 @@ public final class SqlServerPipelineExecutionRequestOutbox
             statement.setString(1, executionId);
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()
-                        || !Arrays.equals(expectedPayload, resultSet.getBytes("Payload"))) {
+                        || !expectedRequest.equals(
+                                new PipelineExecutionRequestJsonCodec().deserialize(
+                                        resultSet.getBytes("Payload")))) {
                     throw new IllegalStateException(
                             "Execution ID already exists with different request content: "
                                     + executionId);
