@@ -78,13 +78,13 @@ public class PipelineExecutor {
             }
             try {
                 stepExecutor.execute(step, context);
-                history.recordSucceeded(step, stepStartedAt);
-                persistence.persistStepFinish(execution.executionId(),
-                        history.records().get(history.records().size() - 1));
             } catch (RuntimeException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
             }
+            history.recordSucceeded(step, stepStartedAt);
+            persistence.persistStepFinish(execution.executionId(),
+                    history.records().get(history.records().size() - 1));
         }
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
