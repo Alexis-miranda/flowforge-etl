@@ -147,6 +147,45 @@ public final class SqlServerPipelineExecutionRequestOutbox
     }
 
     @Override
+    public List<com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus>
+    findRecentRequests(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("Limit must be between 1 and 100");
+        }
+
+        String sql = """
+                SELECT TOP (?) r.ExecutionId, r.PipelineType, r.RequestedAt,
+                       o.Status, o.PublishAttempts, o.LastError
+                FROM dbo.ETLPipelineExecutionRequest r
+                INNER JOIN dbo.ETLOutboxMessage o ON o.ExecutionId = r.ExecutionId
+                ORDER BY r.RequestedAt DESC, r.ExecutionId DESC
+                """;
+        List<com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus> requests =
+                new ArrayList<>();
+
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setInt(1, limit);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    requests.add(new com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus(
+                            UUID.fromString(resultSet.getString("ExecutionId")),
+                            resultSet.getString("PipelineType"),
+                            resultSet.getString("Status"),
+                            resultSet.getTimestamp("RequestedAt").toInstant(),
+                            resultSet.getInt("PublishAttempts"),
+                            resultSet.getString("LastError")));
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Could not find recent pipeline execution requests", exception);
+        }
+
+        return List.copyOf(requests);
+    }
+
+    @Override
     public List<PipelineExecutionOutboxMessage> findPending(int batchSize) {
         if (batchSize < 1) {
             throw new IllegalArgumentException("Batch size must be greater than zero");
