@@ -20,6 +20,7 @@ Run these scripts against `FlowForgeETL_Dev`, in this order:
 6. `07-etl-execution-schema.sql`
 7. `08-cash-output-artifact-metadata.sql`
 8. `../../sql/05-pipeline-step-execution-schema.sql` (durable step audit)
+9. `../../sql/06-pipeline-request-outbox-schema.sql` (asynchronous execution request outbox)
 
 The optional `02-cash-reconciliation-schema.sql` creates reconciliation
 tables, but the first Cash ETL workflow does not use them.
