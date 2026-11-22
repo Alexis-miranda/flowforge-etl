@@ -67,7 +67,7 @@ The project is organized as a Maven multi-module application:
 | `flowforge-core` | Pipeline domain model, execution engine, step executor registry, execution context, execution history, and repository abstractions. |
 | `flowforge-connectors` | Reusable CSV, SQL Server, and SFTP infrastructure connectors, including SQL Server execution-history persistence. |
 | `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, CLI entry points, asynchronous request resolution, and the Cash worker entry point. |
-| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, lease-protected request handler, bounded outbox dispatcher, and transactional outbox port. |
+| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, lease-protected request handler, bounded outbox dispatcher, and transactional outbox port. |\n| `flowforge-api` | HTTP endpoints for accepting pipeline requests and querying request, execution, and step status. |
 
 The core module does not depend on the Cash workflow. The Cash module composes the generic engine with the required connectors and business-specific steps.
 
@@ -169,6 +169,48 @@ Each request carries an input-file path, not the file itself. The path must reso
 
 The worker declares a durable retry queue with a fixed message TTL and dead-letters expired retry messages back to the main queue. On a transient handler failure, it republishes the original message with an incremented retry header, waits for publisher confirmation, and only then acknowledges the original delivery. After the configured retry budget is exhausted, or when a payload is malformed or rejected as non-retryable, it republishes the message to the durable dead-letter queue and acknowledges only after broker confirmation. If republishing fails or times out, the original delivery is negatively acknowledged for broker redelivery. Interrupted handlers are requeued without consuming the retry budget. This is a bounded fixed-delay retry policy, not exponential backoff.\n\nThe worker cancels its consumer on shutdown, waits for in-flight request handlers, stops lease renewal, and then closes its broker resources. This remains an initial application lifecycle, not a production deployment recipe. Dead-letter inspection and replay are operational responsibilities; retrying a dead-lettered execution manually still requires checking its SQL execution state and side effects. Do not treat this worker as production-ready without validating fencing at every side-effect boundary.
 
+
+## Run the REST API
+
+The `flowforge-api` module exposes a small HTTP interface using the JDK HTTP server. It accepts Cash execution requests through the SQL Server transactional outbox; a scheduled dispatcher publishes pending requests to the configured RabbitMQ queue. The API does not execute ETL steps itself.
+
+Start the application with the module runtime classpath and configure:
+
+- `FLOWFORGE_DB_JDBC_URL`, `FLOWFORGE_DB_USER`, `FLOWFORGE_DB_PASSWORD` — required SQL Server settings.
+- `FLOWFORGE_RABBITMQ_URI` — required RabbitMQ connection URI.
+- `FLOWFORGE_RABBITMQ_QUEUE` — queue shared with the Cash worker; defaults to `flowforge.pipeline.requests`.
+- `FLOWFORGE_API_HOST` — bind address; defaults to `127.0.0.1`.
+- `FLOWFORGE_API_PORT` — HTTP port; defaults to `8080`.
+- `FLOWFORGE_API_DISPATCH_INTERVAL_MILLIS` — outbox polling interval; defaults to `1000`.
+- `FLOWFORGE_API_DISPATCH_BATCH_SIZE` — maximum messages per dispatch pass; defaults to `50`.
+- `FLOWFORGE_API_PUBLISH_CONFIRM_TIMEOUT_MILLIS` — RabbitMQ publisher-confirm timeout; defaults to `5000`.
+
+The main queue is declared durable by the API. If `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` is configured, use the same value in the API and worker so their queue declarations match.
+
+### HTTP endpoints
+
+`POST /api/executions` accepts JSON:
+
+```json
+{
+  "pipelineType": "cash",
+  "parameters": {
+    "input": "/shared/input.csv",
+    "backOfficeCode": "BNYM",
+    "outputDirectory": "/shared/output",
+    "columns": "accountCode,currency,amount",
+    "sourceFile": "batch-2026-11-22.csv"
+  }
+}
+```
+
+It returns `202 Accepted` with an `executionId` and `QUEUED` status. The required Cash parameters are `input`, `backOfficeCode`, and `outputDirectory`; file accessibility is validated by the worker because the API and worker may run on different hosts.
+
+- `GET /api/executions/{executionId}` — request delivery and execution status. It reports `QUEUED` while the outbox is pending, `DISPATCHED` after RabbitMQ confirms publication but before the worker creates an execution snapshot, and the persisted execution status thereafter.
+- `GET /api/executions/{executionId}/steps` — persisted step states; returns an empty list while execution has not started.
+
+This is an initial development API, not a public production endpoint: it has no authentication, authorization, TLS termination, rate limiting, or CORS policy. It binds to loopback by default. Do not expose it to an untrusted network without adding those controls. The outbox dispatcher is a single-process polling loop; multiple API instances require an atomic outbox-claim/lease mechanism to avoid concurrent duplicate publication.
+
 ## Project status and boundaries
 
 **Current milestone: functional Cash ETL workflow.** The generic pipeline engine, CSV processing, Cash validation, SQL Server persistence, audit history, execution history, local output publication, delivery tracking, and recovery are implemented and covered by automated tests.
@@ -177,7 +219,7 @@ The following capabilities are **not currently implemented or integrated**:
 
 - Production-ready end-to-end asynchronous execution. The repository now includes a Cash worker entry point that composes the resolver, SQL Server repositories, RabbitMQ consumer, and lease renewal. Operational retry backoff, dead-letter handling, deployment, observability, and end-to-end validation against real broker/database environments remain outstanding. Long-running step implementations must check the execution-context guard before irreversible work; fencing-token validation remains required at side-effect boundaries.
 - Kafka messaging.
-- A REST API or Spring Boot service interface.
+- A production-hardened REST service with authentication, authorization, TLS, rate limiting, and multi-instance outbox claiming.
 - SFTP publication from the Cash workflow.
 - Production deployment topology, broker provisioning, retry backoff, and dead-letter operations.
 
@@ -190,7 +232,7 @@ This is a personal development project, not a production-certified system. Befor
 - [ ] Add operational tooling and runbooks to inspect and safely replay dead-lettered requests.
 - [ ] Add cooperative cancellation checks inside long-running steps and verify fencing at every side-effect boundary.
 - [ ] Add end-to-end tests against disposable RabbitMQ and SQL Server services.
-- [ ] Evaluate a REST interface and service deployment.
+- [ ] Harden the REST API for deployment, including authentication, authorization, TLS, observability, and multi-instance outbox claiming.
 - [ ] Integrate SFTP delivery into the Cash workflow.
 
 ---
