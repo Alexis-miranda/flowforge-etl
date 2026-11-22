@@ -55,7 +55,7 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - Local output delivery tracking, integrity verification, and recovery.
 - Reusable SFTP file reader and writer with SSH host-key verification.
 - Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.
-- A bounded outbox dispatcher, RabbitMQ publisher, manual-ack request consumer, lease-protected request handler with periodic lease renewal, a concrete Cash request-to-pipeline resolver, and a managed Cash worker entry point.
+- A bounded outbox dispatcher, RabbitMQ publisher/consumer, manual-ack request consumer, lease-protected request handler with periodic lease renewal, a concrete Cash request-to-pipeline resolver, a managed Cash worker, and a REST API for submitting and querying executions.
 - Unit tests, filesystem-based integration tests, and SQL Server integration tests.
 
 ## Architecture
@@ -173,7 +173,7 @@ The worker declares a durable retry queue with a fixed message TTL and dead-lett
 
 ## Run the REST API
 
-The `flowforge-api` module exposes a small HTTP interface using the JDK HTTP server. It accepts Cash execution requests through the SQL Server transactional outbox; a scheduled dispatcher publishes pending requests to the configured RabbitMQ queue. The API does not execute ETL steps itself.
+The `flowforge-api` module entry point is `com.flowforge.etl.api.FlowForgeApiApplication`. It exposes a small HTTP interface using the JDK HTTP server. It accepts Cash execution requests through the SQL Server transactional outbox; a scheduled dispatcher publishes pending requests to the configured RabbitMQ queue. The API does not execute ETL steps itself.
 
 Start the application with the module runtime classpath and configure:
 
@@ -210,7 +210,7 @@ It returns `202 Accepted` with an `executionId` and `QUEUED` status. The require
 - `GET /api/executions/{executionId}` — request delivery and execution status. It reports `QUEUED` while the outbox is pending, `DISPATCHED` after RabbitMQ confirms publication but before the worker creates an execution snapshot, and the persisted execution status thereafter.
 - `GET /api/executions/{executionId}/steps` — persisted step states; returns an empty list while execution has not started.
 
-This is an initial development API, not a public production endpoint: it has no authentication, authorization, TLS termination, rate limiting, or CORS policy. It binds to loopback by default. Do not expose it to an untrusted network without adding those controls. The outbox dispatcher is a single-process polling loop; multiple API instances require an atomic outbox-claim/lease mechanism to avoid concurrent duplicate publication.
+This is an initial development API, not a public production endpoint: it has no authentication, authorization, TLS termination, rate limiting, or CORS policy. It binds to loopback by default. Do not expose it to an untrusted network without adding those controls. The outbox dispatcher is a single-process polling loop; multiple API instances require an atomic outbox-claim/lease mechanism to avoid concurrent duplicate publication. A request that reaches the broker but is later dead-lettered before the worker creates an execution snapshot may continue to appear as `DISPATCHED`; durable consumer/DLQ outcome tracking is a separate future capability.
 
 ## Project status and boundaries
 
