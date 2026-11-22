@@ -86,7 +86,7 @@ public final class SqlServerPipelineExecutionRequestOutbox
         }
     }
 
-    private static void verifyIdenticalExistingRequest(
+    private void verifyIdenticalExistingRequest(
             String executionId, PipelineExecutionRequest expectedRequest) {
         try (Connection connection = SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
@@ -98,7 +98,7 @@ public final class SqlServerPipelineExecutionRequestOutbox
             try (ResultSet resultSet = statement.executeQuery()) {
                 if (!resultSet.next()
                         || !expectedRequest.equals(
-                                new PipelineExecutionRequestJsonCodec().deserialize(
+                                codec.deserialize(
                                         resultSet.getBytes("Payload")))) {
                     throw new IllegalStateException(
                             "Execution ID already exists with different request content: "
