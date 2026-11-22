@@ -29,6 +29,12 @@ public final class ExecutionRequestService {
         if (parameters == null) {
             throw new IllegalArgumentException("Parameters must not be null");
         }
+        parameters.forEach((key, value) -> {
+            if (key == null || key.isBlank() || value == null) {
+                throw new IllegalArgumentException(
+                        "Parameter keys must be non-blank and values must not be null");
+            }
+        });
 
         PipelineExecutionRequest request = new PipelineExecutionRequest(
                 UUID.randomUUID(), pipelineType, parameters, clock.instant());
