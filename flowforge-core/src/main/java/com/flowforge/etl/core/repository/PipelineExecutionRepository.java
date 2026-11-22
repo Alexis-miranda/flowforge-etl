@@ -81,8 +81,13 @@ public interface PipelineExecutionRepository {
     Optional<PipelineExecutionSnapshot> findSnapshotByExecutionId(
             String executionId);
 
-    /** Finds persisted step states for one execution, ordered by step start time. */
-    List<PersistedStepExecution> findStepExecutions(String executionId);
+    /**
+     * Finds persisted step states for one execution, ordered by step start time.
+     * Repositories without step-history support return an empty list.
+     */
+    default List<PersistedStepExecution> findStepExecutions(String executionId) {
+        return List.of();
+    }
 
     /**
      * Finds all execution results associated with a pipeline.
