@@ -9,46 +9,46 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 
 /**
  * Persists worker leases in SQL Server.
  *
- * <p>The lease row is retained after release so its fencing token can never
- * be reset. SQL Server row locks and the execution ID primary key arbitrate
- * competing acquisitions.</p>
+ * <p>SQL Server's UTC clock is authoritative for lease expiration, avoiding
+ * disagreements between clocks on different worker machines. Lease rows are
+ * retained after release so fencing tokens can never be reset.</p>
  */
 public final class SqlServerPipelineExecutionLeaseRepository
         implements PipelineExecutionLeaseRepository {
 
     private static final String RECLAIM_EXPIRED_SQL = """
             UPDATE dbo.ETLExecutionLease
-            SET OwnerId = ?, LeaseUntil = ?, FencingToken = FencingToken + 1
+            SET OwnerId = ?, LeaseUntil = DATEADD(SECOND, ?, SYSUTCDATETIME()),
+                FencingToken = FencingToken + 1
             OUTPUT INSERTED.ExecutionId, INSERTED.OwnerId,
                    INSERTED.LeaseUntil, INSERTED.FencingToken
             WHERE ExecutionId = ?
-              AND LeaseUntil <= ?
+              AND LeaseUntil <= SYSUTCDATETIME()
             """;
 
     private static final String INSERT_SQL = """
             INSERT INTO dbo.ETLExecutionLease
                 (ExecutionId, OwnerId, LeaseUntil, FencingToken)
-            VALUES (?, ?, ?, 1)
+            VALUES (?, ?, DATEADD(SECOND, ?, SYSUTCDATETIME()), 1)
             """;
 
     private static final String RENEW_SQL = """
             UPDATE dbo.ETLExecutionLease
-            SET LeaseUntil = ?
+            SET LeaseUntil = DATEADD(SECOND, ?, SYSUTCDATETIME())
             WHERE ExecutionId = ?
               AND OwnerId = ?
               AND FencingToken = ?
-              AND LeaseUntil > ?
+              AND LeaseUntil > SYSUTCDATETIME()
             """;
 
     private static final String RELEASE_SQL = """
             UPDATE dbo.ETLExecutionLease
-            SET OwnerId = NULL, LeaseUntil = ?
+            SET OwnerId = NULL, LeaseUntil = SYSUTCDATETIME()
             WHERE ExecutionId = ?
               AND OwnerId = ?
               AND FencingToken = ?
@@ -56,19 +56,14 @@ public final class SqlServerPipelineExecutionLeaseRepository
 
     @Override
     public Optional<PipelineExecutionLease> tryAcquire(
-            String executionId,
-            String ownerId,
-            Instant now,
-            Duration leaseDuration) {
-        validateRequest(executionId, ownerId, now, leaseDuration);
-        Instant leaseUntil = now.plus(leaseDuration);
+            String executionId, String ownerId, Duration leaseDuration) {
+        int durationSeconds = validateRequest(executionId, ownerId, leaseDuration);
 
         try (Connection connection = SqlServerConnectionFactory.openConnection()) {
             connection.setAutoCommit(false);
             try {
                 Optional<PipelineExecutionLease> reclaimed =
-                        reclaimExpired(connection, executionId, ownerId,
-                                now, leaseUntil);
+                        reclaimExpired(connection, executionId, ownerId, durationSeconds);
                 if (reclaimed.isPresent()) {
                     connection.commit();
                     return reclaimed;
@@ -78,26 +73,26 @@ public final class SqlServerPipelineExecutionLeaseRepository
                              connection.prepareStatement(INSERT_SQL)) {
                     statement.setString(1, executionId);
                     statement.setString(2, ownerId);
-                    statement.setTimestamp(3, Timestamp.from(leaseUntil));
+                    statement.setInt(3, durationSeconds);
                     statement.executeUpdate();
                 }
 
+                // Read back SQL Server's clock-derived expiry, not a worker clock.
+                Optional<PipelineExecutionLease> inserted =
+                        findOwnedLease(connection, executionId, ownerId);
                 connection.commit();
-                return Optional.of(new PipelineExecutionLease(
-                        executionId, ownerId, leaseUntil, 1));
+                return inserted;
             } catch (SQLException exception) {
                 rollback(connection, exception);
                 if (isDuplicateKey(exception)) {
                     return Optional.empty();
                 }
                 throw new IllegalStateException(
-                        "Could not acquire pipeline execution lease",
-                        exception);
+                        "Could not acquire pipeline execution lease", exception);
             }
         } catch (SQLException exception) {
             throw new IllegalStateException(
-                    "Could not acquire pipeline execution lease",
-                    exception);
+                    "Could not acquire pipeline execution lease", exception);
         }
     }
 
@@ -105,41 +100,49 @@ public final class SqlServerPipelineExecutionLeaseRepository
             Connection connection,
             String executionId,
             String ownerId,
-            Instant now,
-            Instant leaseUntil) throws SQLException {
+            int durationSeconds) throws SQLException {
         try (PreparedStatement statement =
                      connection.prepareStatement(RECLAIM_EXPIRED_SQL)) {
             statement.setString(1, ownerId);
-            statement.setTimestamp(2, Timestamp.from(leaseUntil));
+            statement.setInt(2, durationSeconds);
             statement.setString(3, executionId);
-            statement.setTimestamp(4, Timestamp.from(now));
-
             try (ResultSet resultSet = statement.executeQuery()) {
-                if (!resultSet.next()) {
-                    return Optional.empty();
-                }
-                return Optional.of(readLease(resultSet));
+                return resultSet.next()
+                        ? Optional.of(readLease(resultSet))
+                        : Optional.empty();
+            }
+        }
+    }
+
+    private Optional<PipelineExecutionLease> findOwnedLease(
+            Connection connection, String executionId, String ownerId)
+            throws SQLException {
+        try (PreparedStatement statement = connection.prepareStatement("""
+                SELECT ExecutionId, OwnerId, LeaseUntil, FencingToken
+                FROM dbo.ETLExecutionLease
+                WHERE ExecutionId = ? AND OwnerId = ?
+                """)) {
+            statement.setString(1, executionId);
+            statement.setString(2, ownerId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                return resultSet.next()
+                        ? Optional.of(readLease(resultSet))
+                        : Optional.empty();
             }
         }
     }
 
     @Override
-    public boolean renew(
-            PipelineExecutionLease lease,
-            Instant now,
-            Duration leaseDuration) {
+    public boolean renew(PipelineExecutionLease lease, Duration leaseDuration) {
         validateLease(lease);
-        validateTimeAndDuration(now, leaseDuration);
-        Instant renewedUntil = now.plus(leaseDuration);
+        int durationSeconds = validateDuration(leaseDuration);
 
         try (Connection connection = SqlServerConnectionFactory.openConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(RENEW_SQL)) {
-            statement.setTimestamp(1, Timestamp.from(renewedUntil));
+             PreparedStatement statement = connection.prepareStatement(RENEW_SQL)) {
+            statement.setInt(1, durationSeconds);
             statement.setString(2, lease.executionId());
             statement.setString(3, lease.ownerId());
             statement.setLong(4, lease.fencingToken());
-            statement.setTimestamp(5, Timestamp.from(now));
             return statement.executeUpdate() == 1;
         } catch (SQLException exception) {
             throw new IllegalStateException(
@@ -148,21 +151,13 @@ public final class SqlServerPipelineExecutionLeaseRepository
     }
 
     @Override
-    public boolean release(
-            PipelineExecutionLease lease,
-            Instant releasedAt) {
+    public boolean release(PipelineExecutionLease lease) {
         validateLease(lease);
-        if (releasedAt == null) {
-            throw new IllegalArgumentException("Release time must not be null");
-        }
-
         try (Connection connection = SqlServerConnectionFactory.openConnection();
-             PreparedStatement statement =
-                     connection.prepareStatement(RELEASE_SQL)) {
-            statement.setTimestamp(1, Timestamp.from(releasedAt));
-            statement.setString(2, lease.executionId());
-            statement.setString(3, lease.ownerId());
-            statement.setLong(4, lease.fencingToken());
+             PreparedStatement statement = connection.prepareStatement(RELEASE_SQL)) {
+            statement.setString(1, lease.executionId());
+            statement.setString(2, lease.ownerId());
+            statement.setLong(3, lease.fencingToken());
             return statement.executeUpdate() == 1;
         } catch (SQLException exception) {
             throw new IllegalStateException(
@@ -183,8 +178,7 @@ public final class SqlServerPipelineExecutionLeaseRepository
         for (SQLException current = exception;
              current != null;
              current = current.getNextException()) {
-            if (current.getErrorCode() == 2601
-                    || current.getErrorCode() == 2627) {
+            if (current.getErrorCode() == 2601 || current.getErrorCode() == 2627) {
                 return true;
             }
         }
@@ -199,37 +193,31 @@ public final class SqlServerPipelineExecutionLeaseRepository
         }
     }
 
-    private static void validateRequest(
-            String executionId,
-            String ownerId,
-            Instant now,
-            Duration leaseDuration) {
+    private static int validateRequest(
+            String executionId, String ownerId, Duration leaseDuration) {
         if (executionId == null || executionId.isBlank()) {
             throw new IllegalArgumentException("Execution ID must not be blank");
         }
         if (ownerId == null || ownerId.isBlank()) {
             throw new IllegalArgumentException("Lease owner ID must not be blank");
         }
-        validateTimeAndDuration(now, leaseDuration);
+        return validateDuration(leaseDuration);
     }
 
-    private static void validateTimeAndDuration(
-            Instant now,
-            Duration leaseDuration) {
-        if (now == null) {
-            throw new IllegalArgumentException("Current time must not be null");
+    private static int validateDuration(Duration duration) {
+        if (duration == null || duration.isZero() || duration.isNegative()) {
+            throw new IllegalArgumentException("Lease duration must be positive");
         }
-        if (leaseDuration == null || leaseDuration.isZero()
-                || leaseDuration.isNegative()) {
+        long seconds = duration.getSeconds();
+        if (duration.getNano() > 0) {
+            seconds++;
+        }
+        if (seconds < 1 || seconds > Integer.MAX_VALUE) {
             throw new IllegalArgumentException(
-                    "Lease duration must be positive");
+                    "Lease duration must be between 1 second and "
+                            + Integer.MAX_VALUE + " seconds");
         }
-        try {
-            now.plus(leaseDuration);
-        } catch (ArithmeticException exception) {
-            throw new IllegalArgumentException(
-                    "Lease duration is too large", exception);
-        }
+        return (int) seconds;
     }
 
     private static void validateLease(PipelineExecutionLease lease) {
