@@ -1,6 +1,7 @@
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineStatus;
+import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.time.Instant;
@@ -52,6 +53,25 @@ final class PipelineExecutionPersistence {
         }
     }
 
+    void persistStepStart(String executionId, PipelineStep step, Instant startedAt) {
+        if (repository == null) return;
+        try {
+            repository.startStep(executionId, step.id(), step.name(), startedAt);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Could not persist start of step '"
+                    + step.id() + "' for execution " + executionId, exception);
+        }
+    }
+
+    void persistStepFinish(String executionId, StepExecutionRecord record) {
+        if (repository == null) return;
+        try {
+            repository.finishStep(executionId, record);
+        } catch (RuntimeException exception) {
+            throw new IllegalStateException("Could not persist final state of step '"
+                    + record.stepId() + "' for execution " + executionId, exception);
+        }
+    }
     /**
      * Updates the final snapshot and saves the result independently.
      *

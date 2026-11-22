@@ -26,7 +26,7 @@ The project separates the generic pipeline engine, reusable infrastructure conne
 
 File-to-database integrations often involve repetitive manual processing and make failures difficult to track or recover from.
 
-FlowForge brings ingestion, validation, persistence, and output delivery into an observable pipeline. It records pipeline and step execution history, tracks output delivery state, prevents duplicate source loads through a source identifier, and supports recovery of pending local deliveries.
+FlowForge brings ingestion, validation, persistence, and output delivery into an observable pipeline. It records pipeline and durable step execution history, tracks output delivery state, prevents duplicate source loads through a source identifier, and supports recovery of pending local deliveries.
 
 ## Current Cash ETL workflow
 
@@ -48,7 +48,7 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - Step executor registry that resolves implementations by step type and connector key.
 - Shared execution context with optional and required typed accessors.
 - Pipeline lifecycle tracking and per-step execution history.
-- Execution persistence through a repository abstraction, including SQL Server integration.
+- Execution and per-step lifecycle persistence through a repository abstraction, including SQL Server integration.
 - CSV extraction, validation, transformation, and serialization.
 - Cash accepted/rejected record handling and original-row audit.
 - SQL Server load control to identify duplicate source batches.
@@ -116,6 +116,9 @@ The Cash workflow expects a SQL Server database named `FlowForgeETL_Dev`. Create
 4. `05-cash-load-control-schema.sql`
 5. `06-cash-output-delivery-schema.sql`
 6. `07-etl-execution-schema.sql`
+7. `08-cash-output-artifact-metadata.sql`
+
+The generic step lifecycle audit table is created by `docs/sql/05-pipeline-step-execution-schema.sql` after `ETLExecution` exists.
 
 The optional reconciliation tables in `02-cash-reconciliation-schema.sql` are not required by the first Cash workflow.
 

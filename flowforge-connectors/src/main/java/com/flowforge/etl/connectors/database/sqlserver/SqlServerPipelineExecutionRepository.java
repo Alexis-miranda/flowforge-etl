@@ -4,6 +4,8 @@ package com.flowforge.etl.connectors.database.sqlserver;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.StepExecutionRecord;
+import com.flowforge.etl.core.execution.StepExecutionStatus;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 
 import java.sql.Connection;
@@ -364,6 +366,87 @@ public final class SqlServerPipelineExecutionRepository
                 resultSet.getString("ErrorMessage"),
                 resultSet.getTimestamp("StartedAt").toInstant(),
                 finishedAt == null ? null : finishedAt.toInstant());
+    }
+
+
+    @Override
+    public void startStep(String executionId, String stepId, String stepName,
+                          java.time.Instant startedAt) {
+        requireText(executionId, "Execution ID");
+        requireText(stepId, "Step ID");
+        requireText(stepName, "Step name");
+        if (startedAt == null) {
+            throw new IllegalArgumentException("Step start timestamp must not be null");
+        }
+        String sql = """
+                INSERT INTO dbo.ETLStepExecution
+                    (ExecutionId, StepId, StepName, Status, StartedAt)
+                VALUES (?, ?, ?, 'RUNNING', ?)
+                """;
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, executionId);
+            statement.setString(2, stepId);
+            statement.setString(3, stepName);
+            statement.setTimestamp(4, Timestamp.from(startedAt));
+            statement.executeUpdate();
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not persist pipeline step start", exception);
+        }
+    }
+
+    @Override
+    public void finishStep(String executionId, StepExecutionRecord record) {
+        requireText(executionId, "Execution ID");
+        if (record == null) {
+            throw new IllegalArgumentException("Step execution record must not be null");
+        }
+        if (record.status() == StepExecutionStatus.SKIPPED) {
+            String insert = """
+                    INSERT INTO dbo.ETLStepExecution
+                        (ExecutionId, StepId, StepName, Status, StartedAt, FinishedAt,
+                         SkipReason)
+                    VALUES (?, ?, ?, 'SKIPPED', NULL, ?, ?)
+                    """;
+            try (Connection connection = SqlServerConnectionFactory.openConnection();
+                 PreparedStatement statement = connection.prepareStatement(insert)) {
+                statement.setString(1, executionId);
+                statement.setString(2, record.stepId());
+                statement.setString(3, record.stepName());
+                statement.setTimestamp(4, Timestamp.from(record.finishedAt()));
+                statement.setString(5, record.skipReason());
+                statement.executeUpdate();
+                return;
+            } catch (SQLException exception) {
+                throw new IllegalStateException("Could not persist skipped pipeline step", exception);
+            }
+        }
+
+        String update = """
+                UPDATE dbo.ETLStepExecution
+                SET Status = ?, FinishedAt = ?, ExceptionType = ?, ErrorMessage = ?,
+                    CauseType = ?, CauseMessage = ?, FailureClassification = ?
+                WHERE ExecutionId = ? AND StepId = ? AND Status = 'RUNNING'
+                """;
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(update)) {
+            statement.setString(1, record.status().name());
+            statement.setTimestamp(2, Timestamp.from(record.finishedAt()));
+            statement.setString(3, record.exceptionType());
+            statement.setString(4, record.errorMessage());
+            statement.setString(5, record.causeType());
+            statement.setString(6, record.causeMessage());
+            statement.setString(7, record.failureClassification() == null
+                    ? null : record.failureClassification().name());
+            statement.setString(8, executionId);
+            statement.setString(9, record.stepId());
+            if (statement.executeUpdate() != 1) {
+                throw new IllegalStateException("Running step record was not found: "
+                        + executionId + "/" + record.stepId());
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Could not persist completed pipeline step", exception);
+        }
     }
 
     private static void requireText(String value, String fieldName) {
