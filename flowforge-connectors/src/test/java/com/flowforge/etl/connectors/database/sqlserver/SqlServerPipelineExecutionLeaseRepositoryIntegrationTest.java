@@ -67,7 +67,8 @@ class SqlServerPipelineExecutionLeaseRepositoryIntegrationTest {
         assertEquals(first.fencingToken() + 1, second.fencingToken());
     }
 
-    private static void createRunningAuditRecord(String executionId) {\n        Instant startedAt = Instant.now();\n        new SqlServerPipelineExecutionRepository().start(\n                new PipelineExecutionSnapshot(\n                        executionId,\n                        "lease-integration-" + executionId,\n                        PipelineStatus.RUNNING,\n                        null,\n                        null,\n                        startedAt,\n                        null));\n    }\n\n    @Test\n    void shouldAllowOnlyOneConcurrentLeaseAcquisition() throws Exception {
+    private static void createRunningAuditRecord(String executionId) {
+        Instant startedAt = Instant.now();\n        new SqlServerPipelineExecutionRepository().start(\n                new PipelineExecutionSnapshot(\n                        executionId,\n                        "lease-integration-" + executionId,\n                        PipelineStatus.RUNNING,\n                        null,\n                        null,\n                        startedAt,\n                        null));\n    }\n\n    @Test\n    void shouldAllowOnlyOneConcurrentLeaseAcquisition() throws Exception {
         Assumptions.assumeTrue(
                 SqlServerConnectionFactory.isConfigured(),
                 "SQL Server integration test requires database environment variables");
