@@ -11,6 +11,7 @@ import com.flowforge.etl.core.execution.StepExecutionRecord;
 import com.flowforge.etl.core.repository.PipelineExecutionLeaseRepository;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -19,10 +20,20 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class LeaseProtectedPipelineExecutionRequestHandlerTest {
+    private final ScheduledExecutorService renewalScheduler =
+            Executors.newSingleThreadScheduledExecutor();
+
+    @AfterEach
+    void stopRenewalScheduler() {
+        renewalScheduler.shutdownNow();
+    }
+
 
     private static final UUID EXECUTION_ID =
             UUID.fromString("7c5b2a5c-9c36-4b6e-a1d0-19b1d0b0f4d2");
@@ -115,7 +126,8 @@ class LeaseProtectedPipelineExecutionRequestHandlerTest {
             FakeLeaseRepository leases,
             FakeExecutionRepository executions) {
         return new LeaseProtectedPipelineExecutionRequestHandler(
-                resolver, leases, executions, "worker-test", Duration.ofMinutes(5));
+                resolver, leases, executions, "worker-test",
+                Duration.ofMinutes(5), Duration.ofMinutes(1), renewalScheduler);
     }
 
     private static final class FakeLeaseRepository implements PipelineExecutionLeaseRepository {
