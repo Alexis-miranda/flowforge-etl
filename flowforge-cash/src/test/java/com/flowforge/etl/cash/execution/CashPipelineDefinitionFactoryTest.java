@@ -67,6 +67,19 @@ class CashPipelineDefinitionFactoryTest {
     }
 
     @Test
+    void shouldPreserveCallerSuppliedPipelineId() {
+        PipelineDefinition first = CashPipelineDefinitionFactory.create(
+                "cash-etl", tempDir.resolve("cash.csv"), "BNYM",
+                tempDir.resolve("output"), "accountCode,currency,amount", "cash.csv");
+        PipelineDefinition second = CashPipelineDefinitionFactory.create(
+                "cash-etl", tempDir.resolve("cash.csv"), "BNYM",
+                tempDir.resolve("output"), "accountCode,currency,amount", "cash.csv");
+
+        assertEquals("cash-etl", first.id());
+        assertEquals(first.id(), second.id());
+    }
+
+    @Test
     void shouldGenerateDifferentPipelineIdsForSeparateRuns() {
         PipelineDefinition first = createPipeline();
         PipelineDefinition second = createPipeline();
