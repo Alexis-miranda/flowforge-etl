@@ -3,6 +3,7 @@ package com.flowforge.etl.cash.delivery;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
+import com.flowforge.etl.core.execution.PipelineExecutionLease;
 import com.flowforge.etl.core.execution.StepExecutor;
 import org.junit.jupiter.api.Test;
 
@@ -95,7 +96,19 @@ class CashOutputRecoveryServiceTest {
         }
 
         @Override
+        public boolean markPublished(
+                String sourceFile, PipelineExecutionLease lease) {
+            return false;
+        }
+
+        @Override
         public void recordError(String sourceFile, String message) {
+        }
+
+        @Override
+        public boolean recordError(
+                String sourceFile, String message, PipelineExecutionLease lease) {
+            return false;
         }
     }
 
