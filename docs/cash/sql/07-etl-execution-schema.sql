@@ -32,3 +32,27 @@ BEGIN
         ON dbo.ETLExecution (PipelineId, StartedAt DESC);
 END;
 GO
+
+-- Worker ownership is stored separately from the audit lifecycle.
+-- Keep the row after release so fencing tokens remain monotonic.
+IF OBJECT_ID(N'dbo.ETLExecutionLease', N'U') IS NULL
+BEGIN
+    CREATE TABLE dbo.ETLExecutionLease
+    (
+        ExecutionId  NVARCHAR(36) NOT NULL,
+        OwnerId      NVARCHAR(200) NULL,
+        LeaseUntil   DATETIME2(7) NOT NULL,
+        FencingToken BIGINT NOT NULL,
+
+        CONSTRAINT PK_ETLExecutionLease
+            PRIMARY KEY (ExecutionId),
+
+        CONSTRAINT CK_ETLExecutionLease_FencingToken
+            CHECK (FencingToken >= 1),
+
+        CONSTRAINT FK_ETLExecutionLease_ETLExecution
+            FOREIGN KEY (ExecutionId)
+            REFERENCES dbo.ETLExecution (ExecutionId)
+    );
+END;
+GO
