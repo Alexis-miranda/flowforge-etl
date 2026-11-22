@@ -40,40 +40,43 @@ export function NewExecutionModal({
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal" onClick={(event) => event.stopPropagation()}>
+      <div className="modal" role="dialog" aria-modal="true" aria-labelledby="new-execution-title" onClick={(event) => event.stopPropagation()}>
         <div className="modal-head">
           <div>
-            <h2>New pipeline run</h2>
+            <h2 id="new-execution-title">New pipeline run</h2>
             <p>Configure and start a Cash reconciliation run.</p>
           </div>
           <button className="icon-btn" onClick={onClose} aria-label="Close new pipeline run">
             <X size={17} />
           </button>
         </div>
-        <label>Pipeline</label>
+        <div className="field-label">Pipeline</div>
         <div className="pipeline-select"><Workflow size={16} /> Cash reconciliation <span>Active</span></div>
-        <label>Input file path</label>
+        <label htmlFor="execution-source">Input file path</label>
         <input
+          id="execution-source"
           className="form-input"
           value={source}
           onChange={(event) => setSource(event.target.value)}
           placeholder="/shared/input/cash-file.csv"
         />
-        <label>Back office code</label>
+        <label htmlFor="execution-back-office">Back office code</label>
         <input
+          id="execution-back-office"
           className="form-input"
           value={backOffice}
           onChange={(event) => setBackOffice(event.target.value)}
           placeholder="BNYM"
         />
-        <label>Output directory</label>
+        <label htmlFor="execution-output-directory">Output directory</label>
         <input
+          id="execution-output-directory"
           className="form-input"
           value={outputDirectory}
           onChange={(event) => setOutputDirectory(event.target.value)}
         />
         <p className="modal-note">Demo only — this form creates a local sample execution. It does not submit to the backend yet.</p>
-        {validationMessage && <div className="notice">{validationMessage}</div>}
+        {validationMessage && <div className="notice" role="alert">{validationMessage}</div>}
         {notice && <div className="notice">{notice}</div>}
         <div className="modal-actions">
           <button className="secondary" onClick={onClose}>Cancel</button>
