@@ -3,6 +3,7 @@ package com.flowforge.etl.cash.delivery;
 import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
+import com.flowforge.etl.core.execution.PipelineExecutionLease;
 import com.flowforge.etl.core.execution.StepExecutor;
 
 import java.nio.file.Path;
@@ -52,6 +53,8 @@ public class CashOutputPublisherLoader implements StepExecutor {
                     "Missing required configuration: sourceFile");
         }
 
+        PipelineExecutionLease lease = context.executionLease().orElse(null);
+
         CashOutputDelivery delivery =
                 deliveryRepository.findBySourceFile(sourceFile);
 
@@ -66,12 +69,32 @@ public class CashOutputPublisherLoader implements StepExecutor {
 
         try {
             Path publishedFile = filePublisher.publish(delivery);
-            deliveryRepository.markPublished(sourceFile);
+
+            if (lease == null) {
+                deliveryRepository.markPublished(sourceFile);
+            } else if (!deliveryRepository.markPublished(sourceFile, lease)) {
+                // Another valid worker may have completed the same immutable
+                // delivery while this worker was publishing the same payload.
+                CashOutputDelivery latest =
+                        deliveryRepository.findBySourceFile(sourceFile);
+                if (latest == null || !"PUBLISHED".equals(latest.status())) {
+                    throw new IllegalStateException(
+                            "Execution lease is no longer current; "
+                                    + "cash delivery state was not changed");
+                }
+            }
 
             System.out.println("Published FRONT output: "
                     + publishedFile.toAbsolutePath().normalize());
         } catch (Exception exception) {
-            deliveryRepository.recordError(sourceFile, exception.getMessage());
+            if (lease == null) {
+                deliveryRepository.recordError(sourceFile, exception.getMessage());
+            } else {
+                // This update is fenced too: an expired worker must not write
+                // an error over the state owned by a newer execution.
+                deliveryRepository.recordError(
+                        sourceFile, exception.getMessage(), lease);
+            }
             throw new IllegalStateException(
                     "Failed to publish FRONT output for " + sourceFile,
                     exception);
