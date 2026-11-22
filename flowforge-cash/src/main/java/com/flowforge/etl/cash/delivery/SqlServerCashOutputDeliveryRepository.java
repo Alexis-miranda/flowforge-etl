@@ -137,7 +137,7 @@ public class SqlServerCashOutputDeliveryRepository
         try (Connection connection =
                      SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
-            bindLease(statement, lease);
+            bindLease(statement, lease, 0);
             statement.setString(4, sourceFile);
             return statement.executeUpdate() == 1;
         } catch (SQLException exception) {
@@ -196,7 +196,7 @@ public class SqlServerCashOutputDeliveryRepository
                      SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
             statement.setString(1, safeMessage(message));
-            bindLease(statement, lease);
+            bindLease(statement, lease, 1);
             statement.setString(5, sourceFile);
             return statement.executeUpdate() == 1;
         } catch (SQLException exception) {
@@ -208,11 +208,12 @@ public class SqlServerCashOutputDeliveryRepository
     }
 
     private static void bindLease(
-            PreparedStatement statement, PipelineExecutionLease lease)
-            throws SQLException {
-        statement.setString(1, lease.executionId());
-        statement.setString(2, lease.ownerId());
-        statement.setLong(3, lease.fencingToken());
+            PreparedStatement statement,
+            PipelineExecutionLease lease,
+            int offset) throws SQLException {
+        statement.setString(1 + offset, lease.executionId());
+        statement.setString(2 + offset, lease.ownerId());
+        statement.setLong(3 + offset, lease.fencingToken());
     }
 
     private static String safeMessage(String message) {
