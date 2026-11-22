@@ -34,8 +34,9 @@ BEGIN
 END;
 GO
 
--- Worker ownership is stored separately from the audit lifecycle.
--- Keep the row after release so fencing tokens remain monotonic.
+-- A worker must acquire a lease before it inserts the RUNNING execution
+-- snapshot. Therefore ETLExecutionLease must not reference ETLExecution.
+-- Retain released rows so fencing tokens remain monotonic.
 IF OBJECT_ID(N'dbo.ETLExecutionLease', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ETLExecutionLease
@@ -49,11 +50,15 @@ BEGIN
             PRIMARY KEY (ExecutionId),
 
         CONSTRAINT CK_ETLExecutionLease_FencingToken
-            CHECK (FencingToken >= 1),
-
-        CONSTRAINT FK_ETLExecutionLease_ETLExecution
-            FOREIGN KEY (ExecutionId)
-            REFERENCES dbo.ETLExecution (ExecutionId)
+            CHECK (FencingToken >= 1)
     );
+END;
+GO
+
+-- Also remove the obsolete relationship when upgrading an existing database.
+IF OBJECT_ID(N'dbo.FK_ETLExecutionLease_ETLExecution', N'F') IS NOT NULL
+BEGIN
+    ALTER TABLE dbo.ETLExecutionLease
+        DROP CONSTRAINT FK_ETLExecutionLease_ETLExecution;
 END;
 GO
