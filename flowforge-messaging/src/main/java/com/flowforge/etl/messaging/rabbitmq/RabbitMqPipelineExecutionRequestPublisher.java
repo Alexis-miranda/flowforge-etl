@@ -1,5 +1,6 @@
 package com.flowforge.etl.messaging.rabbitmq;
 
+import com.flowforge.etl.messaging.dispatch.PipelineExecutionRequestPublisher;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestJsonCodec;
 import com.rabbitmq.client.AMQP;
@@ -17,7 +18,8 @@ import java.util.concurrent.TimeoutException;
  * for its connection lifecycle and for declaring the exchange and binding the
  * destination queue before publishing.</p>
  */
-public final class RabbitMqPipelineExecutionRequestPublisher {
+public final class RabbitMqPipelineExecutionRequestPublisher
+        implements PipelineExecutionRequestPublisher {
 
     private static final String CONTENT_TYPE = "application/json";
     private static final String CONTENT_ENCODING = "UTF-8";
@@ -69,6 +71,7 @@ public final class RabbitMqPipelineExecutionRequestPublisher {
      * @throws InterruptedException if waiting for confirmation is interrupted
      * @throws TimeoutException if the broker does not confirm in time
      */
+    @Override
     public void publish(PipelineExecutionRequest request)
             throws IOException, InterruptedException, TimeoutException {
 
