@@ -1,14 +1,15 @@
 -- FlowForge ETL - Pipeline execution audit schema
 -- Run against the FlowForgeETL_Dev database.
 -- Stores pipeline-level execution state independently of business tables.
+-- ExecutionId uses VARCHAR(36) consistently with docs/sql/04 and ETLStepExecution.
 
 IF OBJECT_ID(N'dbo.ETLExecution', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ETLExecution
     (
-        ExecutionId NVARCHAR(36) NOT NULL,
+        ExecutionId VARCHAR(36) NOT NULL,
         PipelineId NVARCHAR(200) NOT NULL,
-        Status NVARCHAR(20) NOT NULL,
+        Status VARCHAR(20) NOT NULL,
         FailedStepId NVARCHAR(200) NULL,
         ErrorMessage NVARCHAR(MAX) NULL,
         StartedAt DATETIME2(7) NOT NULL,
@@ -18,13 +19,13 @@ BEGIN
             PRIMARY KEY (ExecutionId),
 
         CONSTRAINT CK_ETLExecution_Status
-            CHECK (Status IN (N'RUNNING', N'SUCCEEDED', N'FAILED')),
+            CHECK (Status IN ('RUNNING', 'SUCCEEDED', 'FAILED')),
 
         CONSTRAINT CK_ETLExecution_FinishedAt
             CHECK (
-                (Status = N'RUNNING' AND FinishedAt IS NULL)
+                (Status = 'RUNNING' AND FinishedAt IS NULL)
                 OR
-                (Status IN (N'SUCCEEDED', N'FAILED') AND FinishedAt IS NOT NULL)
+                (Status IN ('SUCCEEDED', 'FAILED') AND FinishedAt IS NOT NULL)
             )
     );
 
@@ -39,7 +40,7 @@ IF OBJECT_ID(N'dbo.ETLExecutionLease', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ETLExecutionLease
     (
-        ExecutionId  NVARCHAR(36) NOT NULL,
+        ExecutionId  VARCHAR(36) NOT NULL,
         OwnerId      NVARCHAR(200) NULL,
         LeaseUntil   DATETIME2(7) NOT NULL,
         FencingToken BIGINT NOT NULL,
