@@ -6,9 +6,6 @@ A modular ETL application built with **Java 21**. FlowForge processes CSV data t
   <img src="docs/images/flowforge-etl.svg" alt="FlowForge ETL" width="440" />
 </p>
 
-<p align="center">
-  <img src="https://raw.githubusercontent.com/Alexis-miranda/flowforge-etl/main/docs/images/demoFlowForge.png" alt="FlowForge dashboard demo" width="900" />
-</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white" alt="Java 21" />
