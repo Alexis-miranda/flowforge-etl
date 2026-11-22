@@ -47,7 +47,7 @@ class SqlServerPipelineStepExecutionRepositoryIntegrationTest {
                 }
             }
 
-            Instant finishedAt = Instant.now();
+            Instant finishedAt = Instant.now().truncatedTo(java.time.temporal.ChronoUnit.MICROS);
             repository.finishStep(executionId, new StepExecutionRecord(
                     stepId, "Integration step", StepExecutionStatus.SUCCEEDED,
                     startedAt, finishedAt, null, null, null, null, null));
