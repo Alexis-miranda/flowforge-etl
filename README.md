@@ -54,7 +54,9 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - SQL Server load control to identify duplicate source batches.
 - Local output delivery tracking, integrity verification, and recovery.
 - Reusable SFTP file reader and writer with SSH host-key verification.
-- Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.\n- Unit tests, filesystem-based integration tests, and SQL Server integration tests.
+- Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.
+- A bounded outbox dispatcher, RabbitMQ publisher, and manual-ack request consumer adapter.
+- Unit tests, filesystem-based integration tests, and SQL Server integration tests.
 
 ## Architecture
 
@@ -64,7 +66,8 @@ The project is organized as a Maven multi-module application:
 | --- | --- |
 | `flowforge-core` | Pipeline domain model, execution engine, step executor registry, execution context, execution history, and repository abstractions. |
 | `flowforge-connectors` | Reusable CSV, SQL Server, and SFTP infrastructure connectors, including SQL Server execution-history persistence. |
-| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, and CLI entry points. |\n| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher, and transactional outbox port. |
+| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, and CLI entry points. |
+| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, bounded outbox dispatcher, and transactional outbox port. |
 
 The core module does not depend on the Cash workflow. The Cash module composes the generic engine with the required connectors and business-specific steps.
 
@@ -151,10 +154,11 @@ The recovery entry point is `com.flowforge.etl.cash.cli.CashOutputRecoveryCli`. 
 
 The following capabilities are **not currently implemented or integrated**:
 
-- RabbitMQ or Kafka messaging.
+- A continuously running dispatcher/worker application and end-to-end asynchronous pipeline execution. The current module provides the request publisher, bounded outbox dispatch operation, and manual-ack consumer adapter, but not a concrete request handler or worker lifecycle.
+- Kafka messaging.
 - A REST API or Spring Boot service interface.
 - SFTP publication from the Cash workflow.
-- Distributed workers or remote execution.
+- Production deployment topology, broker provisioning, retry backoff, and dead-letter operations.
 
 This is a personal development project, not a production-certified system. Before production use, the official input/output specification, business mappings, operational monitoring, database permissions, backup strategy, deployment security, and recovery procedures must be reviewed and validated.
 
@@ -162,7 +166,7 @@ This is a personal development project, not a production-certified system. Befor
 
 - [ ] Confirm the official output-file specification and production mappings.
 - [ ] Add further transformation types where required by real workflows.
-- [ ] Introduce asynchronous execution through a separate messaging module (RabbitMQ is the first candidate).
+- [ ] Implement a concrete idempotent execution-request handler and worker lifecycle on top of the RabbitMQ consumer.
 - [ ] Evaluate a REST interface and service deployment.
 - [ ] Integrate SFTP delivery into the Cash workflow.
 
