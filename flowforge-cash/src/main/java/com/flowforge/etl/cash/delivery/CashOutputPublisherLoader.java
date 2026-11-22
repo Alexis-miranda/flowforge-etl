@@ -62,7 +62,8 @@ public class CashOutputPublisherLoader implements StepExecutor {
                 CashOutputDelivery latest = deliveryRepository.findBySourceFile(sourceFile);
                 boolean samePublishedArtifact = latest != null
                         && "PUBLISHED".equals(latest.status())
-                        && publishedHash.equals(latest.publishedSha256());
+                        && publishedHash.equals(latest.publishedSha256())
+                        && publishedFile.toString().equals(latest.publishedPath());
                 if (!samePublishedArtifact) {
                     throw new IllegalStateException(
                             "Execution no longer owns the pending delivery; "
