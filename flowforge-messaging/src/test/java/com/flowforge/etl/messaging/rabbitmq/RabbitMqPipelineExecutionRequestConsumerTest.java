@@ -1,5 +1,6 @@
 package com.flowforge.etl.messaging.rabbitmq;
 
+import com.flowforge.etl.messaging.consumer.NonRetryablePipelineExecutionRequestException;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestJsonCodec;
 import com.rabbitmq.client.AMQP;
