@@ -14,8 +14,8 @@ public record PersistedStepExecution(
         if (stepId == null || stepId.isBlank()) {
             throw new IllegalArgumentException("Step ID must not be blank");
         }
-        if (status == null) {
-            throw new IllegalArgumentException("Persisted step status must not be null");
+        if (status == null || status == PersistedStepExecutionStatus.NOT_STARTED) {
+            throw new IllegalArgumentException("Persisted step status must be a durable status");
         }
         if (status == PersistedStepExecutionStatus.RUNNING) {
             if (startedAt == null || finishedAt != null) {
