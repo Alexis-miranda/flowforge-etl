@@ -174,9 +174,12 @@ class CashSqlServerPipelineIntegrationTest {
             assertEquals(PipelineStatus.SUCCEEDED, result.status());
 
             // Verify the durable delivery record and its publication status.
+            Path frontOutput;
+
             String deliverySql = """
                     SELECT BackOfficeCode, OutputFileName, OutputDirectory,
-                           PayloadSha256, DeliveryStatus, PublishedAt
+                           PayloadSha256, DeliveryStatus, PublishedAt,
+                           PublishedPath, PublishedSha256, PublishedExecutionId
                     FROM dbo.CashOutputDelivery
                     WHERE SourceFile = ?
                     """;
@@ -204,17 +207,16 @@ class CashSqlServerPipelineIntegrationTest {
                             .matches("[0-9a-f]{64}"));
                     assertEquals("PUBLISHED", rows.getString("DeliveryStatus"));
                     assertNotNull(rows.getTimestamp("PublishedAt"));
+                    frontOutput = Path.of(rows.getString("PublishedPath"));
+                    assertNotNull(rows.getString("PublishedExecutionId"));
+                    assertEquals(rows.getString("PayloadSha256"),
+                            rows.getString("PublishedSha256").trim());
                     assertTrue(!rows.next(),
                             "Exactly one delivery record should exist");
                 }
             }
 
             // Verify that the FRONT CSV contains only accepted records.
-            Path frontOutput = frontOutputDirectory.resolve(
-                    "newcash_" + backOfficeCode + "_"
-                            + frontTimestamp + ".csv"
-            );
-
             assertTrue(
                     Files.isRegularFile(frontOutput),
                     "The FRONT output CSV must be created"
