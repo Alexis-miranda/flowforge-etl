@@ -3,6 +3,7 @@ package com.flowforge.etl.core.execution;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Stores shared data during a pipeline execution.
@@ -14,6 +15,35 @@ import java.util.Map;
 public class PipelineExecutionContext {
 
     private final Map<String, Object> data = new HashMap<>();
+    private final PipelineExecutionLease executionLease;
+
+    /** Creates an execution context without an externally managed lease. */
+    public PipelineExecutionContext() {
+        this(null);
+    }
+
+    /**
+     * Creates an execution context carrying the lease used to start the execution.
+     *
+     * <p>The lease is an immutable ownership snapshot. Its presence does not
+     * prove that it is still current; operations that rely on ownership must
+     * validate the fencing token against the authoritative lease repository.</p>
+     *
+     * @param executionLease lease associated with this execution, or null when
+     *                       execution is not managed by a lease
+     */
+    public PipelineExecutionContext(PipelineExecutionLease executionLease) {
+        this.executionLease = executionLease;
+    }
+
+    /**
+     * Returns the lease associated with this execution, if one was supplied.
+     *
+     * @return the execution lease, or empty for a locally managed execution
+     */
+    public Optional<PipelineExecutionLease> executionLease() {
+        return Optional.ofNullable(executionLease);
+    }
 
     /**
      * Stores a non-null value in the execution context.

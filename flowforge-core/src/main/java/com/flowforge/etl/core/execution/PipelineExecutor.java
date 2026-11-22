@@ -62,10 +62,44 @@ public class PipelineExecutor {
         return execute(pipeline, new PipelineExecution(pipeline.id(), executionId));
     }
 
+    /**
+     * Executes a pipeline under the supplied lease and preserves its execution ID.
+     *
+     * <p>The lease is made available to every step through
+     * {@link PipelineExecutionContext#executionLease()}. This method does not
+     * acquire, renew, or release the lease, nor does it establish that the lease
+     * remains current. Components performing ownership-sensitive side effects
+     * must validate the fencing token against the authoritative lease repository.</p>
+     *
+     * @param pipeline pipeline definition to execute
+     * @param lease lease acquired for this execution
+     * @return final execution result
+     * @throws IllegalArgumentException if the pipeline or lease is null
+     */
+    public PipelineExecutionResult executeWithLease(
+            PipelineDefinition pipeline,
+            PipelineExecutionLease lease) {
+        validatePipeline(pipeline);
+        if (lease == null) {
+            throw new IllegalArgumentException("Execution lease must not be null");
+        }
+
+        PipelineExecution execution =
+                new PipelineExecution(pipeline.id(), lease.executionId());
+        return execute(pipeline, execution, lease);
+    }
+
     private PipelineExecutionResult execute(
             PipelineDefinition pipeline,
             PipelineExecution execution) {
-        PipelineExecutionContext context = new PipelineExecutionContext();
+        return execute(pipeline, execution, null);
+    }
+
+    private PipelineExecutionResult execute(
+            PipelineDefinition pipeline,
+            PipelineExecution execution,
+            PipelineExecutionLease lease) {
+        PipelineExecutionContext context = new PipelineExecutionContext(lease);
         StepExecutionHistory history = new StepExecutionHistory();
 
         persistence.persistStart(execution);
