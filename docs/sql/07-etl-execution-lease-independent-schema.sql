@@ -1,10 +1,20 @@
--- A worker must acquire its execution lease before inserting the RUNNING
--- execution snapshot. Therefore the lease row cannot have a foreign key to
--- ETLExecution. Execution IDs remain validated by the handler and the lease
--- repository; the lease table retains fencing-token history independently.
-IF OBJECT_ID(N'dbo.FK_ETLExecutionLease_ETLExecution', N'F') IS NOT NULL
+-- FlowForge ETL - Independent execution lease schema
+-- Lease ownership is independent from the execution audit lifecycle.
+
+IF OBJECT_ID(N'dbo.ETLExecutionLease', N'U') IS NULL
 BEGIN
-    ALTER TABLE dbo.ETLExecutionLease
-        DROP CONSTRAINT FK_ETLExecutionLease_ETLExecution;
+    CREATE TABLE dbo.ETLExecutionLease
+    (
+        ExecutionId  VARCHAR(36) NOT NULL,
+        OwnerId      NVARCHAR(200) NULL,
+        LeaseUntil   DATETIME2(7) NOT NULL,
+        FencingToken BIGINT NOT NULL,
+
+        CONSTRAINT PK_ETLExecutionLease
+            PRIMARY KEY (ExecutionId),
+
+        CONSTRAINT CK_ETLExecutionLease_FencingToken
+            CHECK (FencingToken >= 1)
+    );
 END;
 GO
