@@ -121,7 +121,7 @@ class LeaseProtectedPipelineExecutionRequestHandlerTest {
         assertEquals(0, leases.acquireCalls);
     }
 
-    private static LeaseProtectedPipelineExecutionRequestHandler handler(
+    private LeaseProtectedPipelineExecutionRequestHandler handler(
             PipelineExecutionRequestPipelineResolver resolver,
             FakeLeaseRepository leases,
             FakeExecutionRepository executions) {
