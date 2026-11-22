@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp,
-  Clock3, Database, FileClock, Filter, LayoutDashboard, Menu, Play,
-  Plus, Search, Settings2, ShieldCheck, Sparkles, Workflow, X
+  Clock3, Database, FileClock, LayoutDashboard, Menu, Play,
+  Plus, Settings2, ShieldCheck, Sparkles, Workflow, X
 } from 'lucide-react';
 import { Metric } from './components/Metric';
 import { Status } from './components/Status';
+import { ExecutionsTable, type Run } from './features/executions/ExecutionsTable';
 
-type Run = { id: string; pipeline: string; source: string; started: string; duration: string; status: 'Succeeded'|'Running'|'Failed'; rows: string; };
 const seedRuns: Run[] = [
   { id:'EX-2048', pipeline:'Cash reconciliation', source:'cash_2026-11-22.csv', started:'Today, 10:42:18', duration:'02m 14s', status:'Succeeded', rows:'24,891' },
   { id:'EX-2047', pipeline:'Cash reconciliation', source:'cash_2026-11-22_b.csv', started:'Today, 10:38:05', duration:'01m 52s', status:'Running', rows:'18,340' },
@@ -46,7 +46,7 @@ export default function App(){
           <section className="panel chart-panel"><div className="panel-head"><div><h2>Execution activity</h2><p>Pipeline runs over the last 7 days</p></div><button className="select">Last 7 days <ChevronDown size={14}/></button></div><div className="chart"><div className="chart-y"><span>40</span><span>30</span><span>20</span><span>10</span><span>0</span></div><div className="chart-body"><div className="grid-lines"><i/><i/><i/><i/><i/></div><div className="bars">{[28,36,22,44,32,48,39].map((h,i)=><div className="bar-pair" key={i}><div className="bar success-bar" style={{height:(h*1.5)+'%'}}/><div className="bar fail-bar" style={{height:(i===2?10:4)+'%'}}/></div>)}</div><div className="days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div></div><div className="chart-legend"><span><i className="legend-success"/>Successful</span><span><i className="legend-fail"/>Failed</span></div></section>
           <section className="panel pipeline-panel"><div className="panel-head"><div><h2>Pipeline health</h2><p>Current pipeline status</p></div><button className="icon-btn"><ArrowUpRight size={16}/></button></div><div className="health-card"><div className="health-ring"><strong>98.4<small>%</small></strong></div><div><b>All systems operational</b><span>Across 3 active pipelines</span></div></div><div className="pipeline-row"><span className="pipeline-icon"><Workflow size={16}/></span><div><b>Cash reconciliation</b><small>Daily · Last run 12 min ago</small></div><span className="health-pill">Healthy</span></div><div className="pipeline-row"><span className="pipeline-icon blue"><Database size={16}/></span><div><b>Reference data sync</b><small>Hourly · Last run 38 min ago</small></div><span className="health-pill">Healthy</span></div><div className="pipeline-row"><span className="pipeline-icon violet"><Activity size={16}/></span><div><b>Archive processor</b><small>Weekly · Last run 2 days ago</small></div><span className="health-pill">Healthy</span></div></section>
         </div>
-        <section className="panel runs-panel"><div className="panel-head"><div><h2>Recent executions</h2><p>Monitor your latest pipeline activity</p></div><button className="text-button">View all runs <ArrowUpRight size={15}/></button></div><div className="run-toolbar"><div className="tabs">{['All runs','Succeeded','Running','Failed'].map(t=><button key={t} className={filter===t?'chosen':''} onClick={()=>setFilter(t)}>{t}</button>)}</div><div className="search"><Search size={15}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search executions..."/></div><button className="filter-btn"><Filter size={15}/> Filters</button></div><div className="table-wrap"><table><thead><tr><th>EXECUTION</th><th>PIPELINE</th><th>INPUT SOURCE</th><th>STARTED</th><th>DURATION</th><th>RECORDS</th><th>STATUS</th></tr></thead><tbody>{filtered.map(r=><tr key={r.id} onClick={()=>setSelected(r)} className={selected?.id===r.id?'selected-row':''}><td><b className="run-id">{r.id}</b></td><td>{r.pipeline}</td><td><span className="file-cell"><FileClock size={14}/>{r.source}</span></td><td>{r.started}</td><td>{r.duration}</td><td>{r.rows}</td><td><Status status={r.status}/></td></tr>)}</tbody></table>{filtered.length===0&&<div className="empty">No executions match this filter.</div>}</div></section>
+        <ExecutionsTable runs={filtered} filter={filter} query={query} selectedRunId={selected?.id ?? null} onFilterChange={setFilter} onQueryChange={setQuery} onSelectRun={setSelected} />
         <footer>FlowForge ETL <span>•</span> Dashboard prototype <span>•</span> Data shown is illustrative</footer>
       </div>
     </main>
