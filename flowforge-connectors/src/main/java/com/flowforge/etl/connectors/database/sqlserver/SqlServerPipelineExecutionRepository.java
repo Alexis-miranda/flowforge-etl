@@ -4,6 +4,9 @@ package com.flowforge.etl.connectors.database.sqlserver;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.PersistedStepExecution;
+import com.flowforge.etl.core.execution.PersistedStepExecutionStatus;
+import com.flowforge.etl.core.execution.FailureClassification;
 import com.flowforge.etl.core.execution.StepExecutionRecord;
 import com.flowforge.etl.core.execution.StepExecutionStatus;
 import com.flowforge.etl.core.repository.PipelineExecutionRepository;
@@ -447,6 +450,40 @@ public final class SqlServerPipelineExecutionRepository
         } catch (SQLException exception) {
             throw new IllegalStateException("Could not persist completed pipeline step", exception);
         }
+    }
+
+
+    @Override
+    public List<PersistedStepExecution> findStepExecutions(String executionId) {
+        requireText(executionId, "Execution ID");
+        String sql = """
+                SELECT StepId, Status, StartedAt, FinishedAt, FailureClassification
+                FROM dbo.ETLStepExecution
+                WHERE ExecutionId = ?
+                ORDER BY COALESCE(StartedAt, FinishedAt), StepId
+                """;
+        List<PersistedStepExecution> steps = new ArrayList<>();
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, executionId);
+            try (ResultSet resultSet = statement.executeQuery()) {
+                while (resultSet.next()) {
+                    String classification = resultSet.getString("FailureClassification");
+                    Timestamp startedAt = resultSet.getTimestamp("StartedAt");
+                    Timestamp finishedAt = resultSet.getTimestamp("FinishedAt");
+                    steps.add(new PersistedStepExecution(
+                            resultSet.getString("StepId"),
+                            PersistedStepExecutionStatus.valueOf(resultSet.getString("Status")),
+                            startedAt == null ? null : startedAt.toInstant(),
+                            finishedAt == null ? null : finishedAt.toInstant(),
+                            classification == null ? null : FailureClassification.valueOf(classification)));
+                }
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Could not find persisted pipeline step executions", exception);
+        }
+        return List.copyOf(steps);
     }
 
     private static void requireText(String value, String fieldName) {
