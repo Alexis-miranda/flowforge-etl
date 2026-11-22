@@ -74,7 +74,7 @@ The development API supports submitting Cash executions and querying recent exec
 
 ## Project status
 
-<badge>Demo candidate · active development</badge>
+**Status:** Demo candidate · active development
 
 Cash output currently targets the local filesystem. SFTP publication is not integrated into the Cash workflow. This project is not production-ready; review the [roadmap and release boundaries](docs/roadmap.md) before planning a public demo or real-data deployment.
 
