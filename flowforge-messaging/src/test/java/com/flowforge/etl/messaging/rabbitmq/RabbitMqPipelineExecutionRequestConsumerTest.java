@@ -269,6 +269,40 @@ class RabbitMqPipelineExecutionRequestConsumerTest {
         assertEquals("flowforge.requests.dead", publishArguments.get()[1]);
     }
 
+
+    @Test
+    void shouldRequeueOriginalWhenRetryPublishCannotBeConfirmed() throws Exception {
+        AtomicReference<DeliverCallback> callback = new AtomicReference<>();
+        AtomicReference<Object[]> nackArguments = new AtomicReference<>();
+        Channel channel = channelProxy((method, args) -> {
+            if ("basicConsume".equals(method)) {
+                callback.set((DeliverCallback) args[2]);
+                return "consumer-1";
+            }
+            if ("waitForConfirmsOrDie".equals(method)) {
+                throw new java.io.IOException("broker channel failed");
+            }
+            if ("basicNack".equals(method)) {
+                nackArguments.set(args);
+            }
+            return null;
+        });
+        RabbitMqPipelineExecutionRequestConsumer consumer =
+                new RabbitMqPipelineExecutionRequestConsumer(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        request -> { throw new IllegalStateException("temporary"); },
+                        "flowforge.requests", 1,
+                        new RabbitMqRetryPolicy(
+                                "flowforge.requests.retry", "flowforge.requests.dead", 2, 1000, 5000));
+
+        consumer.start();
+        callback.get().handle("consumer-1", delivery(48,
+                new PipelineExecutionRequestJsonCodec().serialize(REQUEST)));
+
+        assertEquals(48L, nackArguments.get()[0]);
+        assertEquals(true, nackArguments.get()[2]);
+    }
+
     private static Delivery delivery(long tag, byte[] body) {
         return delivery(tag, body,
                 new AMQP.BasicProperties.Builder().contentType("application/json").build());
