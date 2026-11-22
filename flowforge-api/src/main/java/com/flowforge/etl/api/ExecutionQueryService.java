@@ -7,6 +7,7 @@ import com.flowforge.etl.messaging.outbox.PipelineExecutionRequestOutbox;
 import com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -31,18 +32,34 @@ public final class ExecutionQueryService {
                 executions.findSnapshotByExecutionId(executionId.toString());
         if (snapshot.isPresent()) {
             PipelineExecutionSnapshot value = snapshot.get();
-            return Optional.of(new ExecutionStatus(
-                    executionId.toString(),
-                    value.pipelineId(),
-                    value.status().name(),
-                    value.failedStepId(),
-                    value.errorMessage(),
-                    value.startedAt(),
-                    value.finishedAt()));
+            Instant requestedAt = requests.findRequestStatus(executionId)
+                    .map(PipelineExecutionRequestStatus::requestedAt)
+                    .orElse(null);
+            return Optional.of(toStatus(executionId, value, requestedAt));
         }
 
         return requests.findRequestStatus(executionId)
                 .map(ExecutionQueryService::queuedStatus);
+    }
+
+    /**
+     * Returns the latest accepted requests, including requests still waiting
+     * for RabbitMQ dispatch or worker execution.
+     */
+    public List<ExecutionStatus> findRecent(int limit) {
+        if (limit < 1 || limit > 100) {
+            throw new IllegalArgumentException("Limit must be between 1 and 100");
+        }
+
+        List<ExecutionStatus> recent = new ArrayList<>();
+        for (PipelineExecutionRequestStatus request : requests.findRecentRequests(limit)) {
+            Optional<PipelineExecutionSnapshot> snapshot =
+                    executions.findSnapshotByExecutionId(request.executionId().toString());
+            recent.add(snapshot
+                    .map(value -> toStatus(request.executionId(), value, request.requestedAt()))
+                    .orElseGet(() -> queuedStatus(request)));
+        }
+        return List.copyOf(recent);
     }
 
     public Optional<ExecutionSteps> findSteps(UUID executionId) {
@@ -50,6 +67,21 @@ public final class ExecutionQueryService {
                 status.executionId(),
                 status.status(),
                 executions.findStepExecutions(executionId.toString())));
+    }
+
+    private static ExecutionStatus toStatus(
+            UUID executionId,
+            PipelineExecutionSnapshot snapshot,
+            Instant requestedAt) {
+        return new ExecutionStatus(
+                executionId.toString(),
+                snapshot.pipelineId(),
+                snapshot.status().name(),
+                snapshot.failedStepId(),
+                snapshot.errorMessage(),
+                snapshot.startedAt(),
+                snapshot.finishedAt(),
+                requestedAt);
     }
 
     private static ExecutionStatus queuedStatus(PipelineExecutionRequestStatus request) {
@@ -61,7 +93,8 @@ public final class ExecutionQueryService {
                 null,
                 request.lastError(),
                 null,
-                null);
+                null,
+                request.requestedAt());
     }
 
     public record ExecutionStatus(
@@ -71,7 +104,8 @@ public final class ExecutionQueryService {
             String failedStepId,
             String errorMessage,
             Instant startedAt,
-            Instant finishedAt) { }
+            Instant finishedAt,
+            Instant requestedAt) { }
 
     public record ExecutionSteps(
             String executionId,
