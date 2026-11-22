@@ -81,6 +81,44 @@ class LeaseProtectedPipelineExecutionRequestHandlerTest {
     }
 
     @Test
+    void shouldRouteInterruptedRunningExecutionToRecoveryHandling() {
+        FakeExecutionRepository executions = new FakeExecutionRepository();
+        executions.snapshots.put(EXECUTION_ID.toString(), new PipelineExecutionSnapshot(
+                EXECUTION_ID.toString(), PIPELINE.id(), PipelineStatus.RUNNING,
+                null, null, Instant.parse("2026-11-22T10:00:00Z"), null));
+        FakeLeaseRepository leases = new FakeLeaseRepository();
+        PipelineExecutor executor = new PipelineExecutor(List.of(), null, executions);
+
+        assertThrows(ExecutionRequiresRecoveryException.class, () ->
+                handler(request -> new PipelineExecutionRequestPipeline(PIPELINE, executor),
+                        leases, executions).handle(REQUEST));
+
+        assertEquals(PipelineStatus.RUNNING,
+                executions.findSnapshotByExecutionId(EXECUTION_ID.toString()).orElseThrow().status());
+        assertEquals(1, leases.releaseCalls);
+    }
+
+    @Test
+    void shouldTreatAnAlreadyFailedExecutionAsTerminalDuplicate() {
+        FakeExecutionRepository executions = new FakeExecutionRepository();
+        executions.snapshots.put(EXECUTION_ID.toString(), new PipelineExecutionSnapshot(
+                EXECUTION_ID.toString(), PIPELINE.id(), PipelineStatus.FAILED,
+                "persist", "previous attempt failed",
+                Instant.parse("2026-11-22T10:00:00Z"),
+                Instant.parse("2026-11-22T10:01:00Z")));
+        FakeLeaseRepository leases = new FakeLeaseRepository();
+        PipelineExecutor executor = new PipelineExecutor(List.of(), null, executions);
+
+        assertDoesNotThrow(() ->
+                handler(request -> new PipelineExecutionRequestPipeline(PIPELINE, executor),
+                        leases, executions).handle(REQUEST));
+
+        assertEquals(PipelineStatus.FAILED,
+                executions.findSnapshotByExecutionId(EXECUTION_ID.toString()).orElseThrow().status());
+        assertEquals(1, leases.releaseCalls);
+    }
+
+    @Test
     void shouldFailTransientlyWhenLeaseIsUnavailable() {
         FakeExecutionRepository executions = new FakeExecutionRepository();
         FakeLeaseRepository leases = new FakeLeaseRepository();

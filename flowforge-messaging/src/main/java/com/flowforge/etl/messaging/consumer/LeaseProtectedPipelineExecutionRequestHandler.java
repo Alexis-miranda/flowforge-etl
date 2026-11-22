@@ -25,9 +25,10 @@ import java.util.concurrent.ScheduledExecutorService;
  * side effects; fencing-token validation remains mandatory at persistence and
  * external side-effect boundaries.</p>
  *
- * <p>An existing execution with the same ID and pipeline is treated as already
- * claimed and is not executed again. Interrupted RUNNING executions are left
- * for the separate recovery workflow.</p>
+ * <p>Existing terminal executions are treated as duplicate deliveries and are
+ * not executed again. An existing RUNNING execution is routed to dead-letter
+ * handling because it may require reconciliation by the separate recovery
+ * workflow; it must not be acknowledged as successfully handled.</p>
  */
 public final class LeaseProtectedPipelineExecutionRequestHandler
         implements PipelineExecutionRequestHandler {
@@ -144,6 +145,9 @@ public final class LeaseProtectedPipelineExecutionRequestHandler
             throw new NonRetryablePipelineExecutionRequestException(
                     "Execution ID is already registered for a different pipeline: "
                             + executionId);
+        }
+        if (snapshot.status() == com.flowforge.etl.core.domain.PipelineStatus.RUNNING) {
+            throw new ExecutionRequiresRecoveryException(executionId);
         }
     }
 }
