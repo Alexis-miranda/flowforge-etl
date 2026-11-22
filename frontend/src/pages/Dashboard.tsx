@@ -5,7 +5,8 @@ import {
   Plus, Settings2, ShieldCheck, Sparkles, Workflow
 } from 'lucide-react';
 import { Metric } from '../components/Metric';
-import { ExecutionsTable, type Run } from '../features/executions/ExecutionsTable';
+import { ExecutionsTable } from '../features/executions/ExecutionsTable';
+import type { ExecutionFilter, Run } from '../features/executions/types';
 import { ExecutionDetails } from '../features/executions/ExecutionDetails';
 import { NewExecutionModal, type NewExecutionInput } from '../features/executions/NewExecutionModal';
 
@@ -18,7 +19,7 @@ const seedRuns: Run[] = [
   { id:'EX-2043', pipeline:'Cash reconciliation', source:'cash_2026-11-20_b.csv', started:'Yesterday, 16:02:20', duration:'02m 31s', status:'Succeeded', rows:'26,104' },
 ];
 export default function Dashboard(){
-  const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
+  const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState<ExecutionFilter>('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
   const [notice,setNotice]=useState('');
   const filtered=useMemo(()=>runs.filter(r=>(filter==='All runs'||r.status===filter)&&[r.id,r.source,r.pipeline].join(' ').toLowerCase().includes(query.toLowerCase())),[runs,filter,query]);
   const launch=({source}:NewExecutionInput)=>{const run:Run={id:'EX-'+(2050+runs.length),pipeline:'Cash reconciliation',source:source.split('/').pop()||source,started:'Just now',duration:'—',status:'Running',rows:'—'};setRuns([run,...runs]);setSelected(run);setModal(false);setNotice('Demo execution created locally. API integration is the next step.');};

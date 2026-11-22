@@ -1,6 +1,6 @@
 import { ShieldCheck, X } from 'lucide-react';
 import { Status } from '../../components/Status';
-import type { Run } from './ExecutionsTable';
+import type { Run } from './types';
 
 type ExecutionDetailsProps = {
   run: Run;

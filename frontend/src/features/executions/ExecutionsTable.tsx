@@ -1,23 +1,13 @@
 import { ArrowUpRight, FileClock, Filter, Search } from 'lucide-react';
 import { Status } from '../../components/Status';
-import type { RunStatus } from '../../components/Status';
-
-export type Run = {
-  id: string;
-  pipeline: string;
-  source: string;
-  started: string;
-  duration: string;
-  status: RunStatus;
-  rows: string;
-};
+import type { ExecutionFilter, Run } from './types';
 
 type ExecutionsTableProps = {
   runs: Run[];
-  filter: string;
+  filter: ExecutionFilter;
   query: string;
   selectedRunId: string | null;
-  onFilterChange: (filter: string) => void;
+  onFilterChange: (filter: ExecutionFilter) => void;
   onQueryChange: (query: string) => void;
   onSelectRun: (run: Run) => void;
 };
@@ -39,7 +29,7 @@ export function ExecutionsTable({
       </div>
       <div className="run-toolbar">
         <div className="tabs">
-          {['All runs', 'Succeeded', 'Running', 'Failed'].map((tab) => (
+          {(['All runs', 'Succeeded', 'Running', 'Failed'] satisfies ExecutionFilter[]).map((tab) => (
             <button key={tab} className={filter === tab ? 'chosen' : ''} onClick={() => onFilterChange(tab)}>
               {tab}
             </button>
