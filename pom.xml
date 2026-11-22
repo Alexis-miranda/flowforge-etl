@@ -18,6 +18,7 @@
         <module>flowforge-connectors</module>
         <module>flowforge-cash</module>
         <module>flowforge-messaging</module>
+        <module>flowforge-api</module>
     </modules>
 
     <properties>
