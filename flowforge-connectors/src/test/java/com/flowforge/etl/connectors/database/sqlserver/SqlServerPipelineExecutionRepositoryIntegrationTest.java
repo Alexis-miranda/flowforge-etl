@@ -3,6 +3,9 @@ package com.flowforge.etl.connectors.database.sqlserver;
 import com.flowforge.etl.core.domain.PipelineStatus;
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.PersistedStepExecutionStatus;
+import com.flowforge.etl.core.execution.StepExecutionRecord;
+import com.flowforge.etl.core.execution.StepExecutionStatus;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -64,6 +67,20 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
         assertEquals(PipelineStatus.RUNNING, persistedRunning.status());
         assertEquals(startedAt, persistedRunning.startedAt());
         assertEquals(null, persistedRunning.finishedAt());
+
+
+        Instant stepStartedAt = startedAt.plusSeconds(1);
+        Instant stepFinishedAt = stepStartedAt.plusSeconds(2);
+        repository.startStep(executionId, "step-1", "Integration step", stepStartedAt);
+        assertEquals(PersistedStepExecutionStatus.RUNNING,
+                repository.findStepExecutions(executionId).get(0).status());
+        repository.finishStep(executionId, new StepExecutionRecord(
+                "step-1", "Integration step", StepExecutionStatus.SUCCEEDED,
+                stepStartedAt, stepFinishedAt,
+                null, null, null, null, null));
+        assertEquals(List.of(PersistedStepExecutionStatus.SUCCEEDED),
+                repository.findStepExecutions(executionId).stream()
+                        .map(step -> step.status()).toList());
 
         Instant finishedAt = Instant.now()
                 .truncatedTo(ChronoUnit.MICROS);

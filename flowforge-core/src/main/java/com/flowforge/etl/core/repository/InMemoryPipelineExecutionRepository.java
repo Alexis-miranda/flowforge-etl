@@ -3,6 +3,12 @@ package com.flowforge.etl.core.repository;
 
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.PersistedStepExecution;
+import com.flowforge.etl.core.execution.PersistedStepExecutionStatus;
+import com.flowforge.etl.core.execution.StepExecutionRecord;
+import com.flowforge.etl.core.execution.StepExecutionStatus;
+
+import java.time.Instant;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,6 +28,9 @@ public class InMemoryPipelineExecutionRepository
             new LinkedHashMap<>();
 
     private final Map<String, PipelineExecutionResult> results =
+            new LinkedHashMap<>();
+
+    private final Map<String, Map<String, PersistedStepExecution>> stepExecutions =
             new LinkedHashMap<>();
 
     @Override
@@ -155,6 +164,69 @@ public class InMemoryPipelineExecutionRepository
         }
 
         return List.copyOf(matching);
+    }
+
+
+    @Override
+    public synchronized void startStep(
+            String executionId, String stepId, String stepName, Instant startedAt) {
+        validateExecutionId(executionId);
+        if (stepId == null || stepId.isBlank()) {
+            throw new IllegalArgumentException("Step ID must not be blank");
+        }
+        if (stepName == null || stepName.isBlank()) {
+            throw new IllegalArgumentException("Step name must not be blank");
+        }
+        if (startedAt == null) {
+            throw new IllegalArgumentException("Step start timestamp must not be null");
+        }
+        if (!snapshots.containsKey(executionId)) {
+            throw new IllegalArgumentException("Execution does not exist: " + executionId);
+        }
+        Map<String, PersistedStepExecution> steps =
+                stepExecutions.computeIfAbsent(executionId, ignored -> new LinkedHashMap<>());
+        if (steps.containsKey(stepId)) {
+            throw new IllegalStateException("Step execution already exists: " + stepId);
+        }
+        steps.put(stepId, new PersistedStepExecution(
+                stepId, PersistedStepExecutionStatus.RUNNING, startedAt, null, null));
+    }
+
+    @Override
+    public synchronized void finishStep(String executionId, StepExecutionRecord record) {
+        validateExecutionId(executionId);
+        if (record == null) {
+            throw new IllegalArgumentException("Step execution record must not be null");
+        }
+        Map<String, PersistedStepExecution> steps = stepExecutions.get(executionId);
+        if (steps == null) {
+            throw new IllegalStateException("Step execution was not started: " + record.stepId());
+        }
+        if (record.status() == StepExecutionStatus.SKIPPED) {
+            if (steps.containsKey(record.stepId())) {
+                throw new IllegalStateException("Skipped step already has a record: " + record.stepId());
+            }
+            steps.put(record.stepId(), new PersistedStepExecution(
+                    record.stepId(), PersistedStepExecutionStatus.SKIPPED,
+                    null, record.finishedAt(), null));
+            return;
+        }
+        PersistedStepExecution current = steps.get(record.stepId());
+        if (current == null || current.status() != PersistedStepExecutionStatus.RUNNING) {
+            throw new IllegalStateException("Running step record was not found: " + record.stepId());
+        }
+        PersistedStepExecutionStatus status = record.status() == StepExecutionStatus.SUCCEEDED
+                ? PersistedStepExecutionStatus.SUCCEEDED : PersistedStepExecutionStatus.FAILED;
+        steps.put(record.stepId(), new PersistedStepExecution(
+                record.stepId(), status, current.startedAt(), record.finishedAt(),
+                record.failureClassification()));
+    }
+
+    @Override
+    public synchronized List<PersistedStepExecution> findStepExecutions(String executionId) {
+        validateExecutionId(executionId);
+        Map<String, PersistedStepExecution> steps = stepExecutions.get(executionId);
+        return steps == null ? List.of() : List.copyOf(steps.values());
     }
 
     private void validateExecutionId(String executionId) {
