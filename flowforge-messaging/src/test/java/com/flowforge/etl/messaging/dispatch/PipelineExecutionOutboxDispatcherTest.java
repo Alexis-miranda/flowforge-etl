@@ -71,7 +71,7 @@ class PipelineExecutionOutboxDispatcherTest {
 
     @Test
     void shouldStopAfterInterruptedPublishAndRestoreInterruptFlag() {
-        PipelineExecutionRequestOutboxDispatcherTest.FakeOutbox outbox =
+        FakeOutbox outbox =
                 new FakeOutbox(List.of(message(), messageWithNewId()));
         int[] publishCalls = {0};
         PipelineExecutionOutboxDispatcher dispatcher =
