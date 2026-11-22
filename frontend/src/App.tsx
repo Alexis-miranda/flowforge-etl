@@ -16,7 +16,6 @@ const seedRuns: Run[] = [
   { id:'EX-2044', pipeline:'Cash reconciliation', source:'cash_2026-11-20.csv', started:'Yesterday, 17:12:49', duration:'01m 44s', status:'Succeeded', rows:'19,602' },
   { id:'EX-2043', pipeline:'Cash reconciliation', source:'cash_2026-11-20_b.csv', started:'Yesterday, 16:02:20', duration:'02m 31s', status:'Succeeded', rows:'26,104' },
 ];
-const steps=[{name:'Extract source file',detail:'Read input and detect format',time:'00:12',done:true},{name:'Validate records',detail:'Schema, required fields and amount rules',time:'00:18',done:true},{name:'Prepare cash data',detail:'Normalize values and map fields',time:'00:36',done:true},{name:'Persist to database',detail:'SQL Server transactional write',time:'00:42',done:true},{name:'Publish output',detail:'Write output artifact',time:'00:16',done:true}];
 export default function App(){
   const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
   const [source,setSource]=useState(''); const [backOffice,setBackOffice]=useState('BNYM'); const [output,setOutput]=useState('/data/output'); const [notice,setNotice]=useState('');
