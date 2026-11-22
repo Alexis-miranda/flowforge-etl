@@ -5,8 +5,8 @@ import {
   Plus, Settings2, ShieldCheck, Sparkles, Workflow, X
 } from 'lucide-react';
 import { Metric } from './components/Metric';
-import { Status } from './components/Status';
 import { ExecutionsTable, type Run } from './features/executions/ExecutionsTable';
+import { ExecutionDetails } from './features/executions/ExecutionDetails';
 
 const seedRuns: Run[] = [
   { id:'EX-2048', pipeline:'Cash reconciliation', source:'cash_2026-11-22.csv', started:'Today, 10:42:18', duration:'02m 14s', status:'Succeeded', rows:'24,891' },
@@ -50,7 +50,8 @@ export default function App(){
         <footer>FlowForge ETL <span>•</span> Dashboard prototype <span>•</span> Data shown is illustrative</footer>
       </div>
     </main>
-    {selected&&<aside className="detail-drawer"><button className="close-detail" onClick={()=>setSelected(null)}><X size={16}/></button><div className="eyebrow">EXECUTION DETAIL</div><h2>{selected.id}</h2><Status status={selected.status}/><div className="detail-source"><small>INPUT FILE</small><b>{selected.source}</b></div><div className="detail-title">Pipeline steps</div>{steps.map((s,i)=><div className="detail-step" key={s.name}><div className={'step-check '+(selected.status==='Failed'&&i===2?'fail':'')}>{selected.status==='Failed'&&i===2?'!':'✓'}</div><div><b>{s.name}</b><small>{s.detail}</small></div><span>{selected.status==='Running'&&i===4?'…':s.time}</span></div>)}<div className="detail-info"><ShieldCheck size={15}/> Execution details are sample data until connected to the REST API.</div></aside>}
+    {selected && <ExecutionDetails run={selected} onClose={() => setSelected(null)} />}
+
     {modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>New pipeline run</h2><p>Configure and start a Cash reconciliation run.</p></div><button className="icon-btn" onClick={()=>setModal(false)}><X size={17}/></button></div><label>Pipeline</label><div className="pipeline-select"><Workflow size={16}/> Cash reconciliation <span>Active</span></div><label>Input file path</label><input className="form-input" value={source} onChange={e=>setSource(e.target.value)} placeholder="/shared/input/cash-file.csv"/><label>Back office code</label><input className="form-input" value={backOffice} onChange={e=>setBackOffice(e.target.value)} placeholder="BNYM"/><label>Output directory</label><input className="form-input" value={output} onChange={e=>setOutput(e.target.value)}/><p className="modal-note">Demo only — this form creates a local sample execution. It does not submit to the backend yet.</p>{notice&&<div className="notice">{notice}</div>}<div className="modal-actions"><button className="secondary" onClick={()=>setModal(false)}>Cancel</button><button className="primary" onClick={launch}><Play size={15}/> Start demo run</button></div></div></div>}
   </div>
 }
