@@ -17,7 +17,7 @@ const steps = [
 
 export function ExecutionDetails({ run, onClose }: ExecutionDetailsProps) {
   return (
-    <aside className="detail-drawer">
+    <aside className="detail-drawer" aria-label={`Execution details for ${run.id}`}>
       <button className="close-detail" onClick={onClose} aria-label="Close execution details">
         <X size={16} />
       </button>
