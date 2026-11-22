@@ -1,6 +1,7 @@
 package com.flowforge.etl.cash.delivery;
 
 import com.flowforge.etl.connectors.database.sqlserver.SqlServerConnectionFactory;
+import com.flowforge.etl.core.execution.PipelineExecutionLease;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -108,6 +109,44 @@ public class SqlServerCashOutputDeliveryRepository
         }
     }
 
+    /**
+     * Fences the state transition in the same SQL statement that updates the
+     * delivery. A prior lease check would have a race with lease expiration or
+     * reacquisition, so the current owner and fencing token are joined here.
+     */
+    @Override
+    public boolean markPublished(
+            String sourceFile, PipelineExecutionLease lease) {
+        validateLease(lease);
+
+        String sql = """
+                UPDATE delivery
+                SET DeliveryStatus = N'PUBLISHED',
+                    PublishedAt = SYSUTCDATETIME(),
+                    LastError = NULL
+                FROM dbo.CashOutputDelivery AS delivery
+                INNER JOIN dbo.ETLExecutionLease AS executionLease
+                    ON executionLease.ExecutionId = ?
+                   AND executionLease.OwnerId = ?
+                   AND executionLease.FencingToken = ?
+                   AND executionLease.LeaseUntil > SYSUTCDATETIME()
+                WHERE delivery.SourceFile = ?
+                  AND delivery.DeliveryStatus = N'PENDING'
+                """;
+
+        try (Connection connection =
+                     SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            bindLease(statement, lease);
+            statement.setString(4, sourceFile);
+            return statement.executeUpdate() == 1;
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "File was published but fenced SQL delivery status update failed",
+                    exception);
+        }
+    }
+
     @Override
     public void recordError(String sourceFile, String message) {
         String sql = """
@@ -121,20 +160,73 @@ public class SqlServerCashOutputDeliveryRepository
                      SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement(sql)) {
 
-            String safeMessage = message == null
-                    ? "Unknown publication error"
-                    : message;
-
-            statement.setString(1,
-                    safeMessage.length() > 1000
-                            ? safeMessage.substring(0, 1000)
-                            : safeMessage);
+            statement.setString(1, safeMessage(message));
             statement.setString(2, sourceFile);
             statement.executeUpdate();
         } catch (SQLException exception) {
             System.err.println(
                     "Could not record delivery error: "
                             + exception.getMessage());
+        }
+    }
+
+    /**
+     * A stale worker must not overwrite the diagnostic state of the current
+     * lease holder. The lease predicate is evaluated atomically with the update.
+     */
+    @Override
+    public boolean recordError(
+            String sourceFile, String message, PipelineExecutionLease lease) {
+        validateLease(lease);
+
+        String sql = """
+                UPDATE delivery
+                SET LastError = ?
+                FROM dbo.CashOutputDelivery AS delivery
+                INNER JOIN dbo.ETLExecutionLease AS executionLease
+                    ON executionLease.ExecutionId = ?
+                   AND executionLease.OwnerId = ?
+                   AND executionLease.FencingToken = ?
+                   AND executionLease.LeaseUntil > SYSUTCDATETIME()
+                WHERE delivery.SourceFile = ?
+                  AND delivery.DeliveryStatus = N'PENDING'
+                """;
+
+        try (Connection connection =
+                     SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, safeMessage(message));
+            bindLease(statement, lease);
+            statement.setString(5, sourceFile);
+            return statement.executeUpdate() == 1;
+        } catch (SQLException exception) {
+            System.err.println(
+                    "Could not record fenced delivery error: "
+                            + exception.getMessage());
+            return false;
+        }
+    }
+
+    private static void bindLease(
+            PreparedStatement statement, PipelineExecutionLease lease)
+            throws SQLException {
+        statement.setString(1, lease.executionId());
+        statement.setString(2, lease.ownerId());
+        statement.setLong(3, lease.fencingToken());
+    }
+
+    private static String safeMessage(String message) {
+        String safeMessage = message == null
+                ? "Unknown publication error"
+                : message;
+        return safeMessage.length() > 1000
+                ? safeMessage.substring(0, 1000)
+                : safeMessage;
+    }
+
+    private static void validateLease(PipelineExecutionLease lease) {
+        if (lease == null) {
+            throw new IllegalArgumentException("Execution lease must not be null");
         }
     }
 }
