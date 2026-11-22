@@ -53,7 +53,7 @@ jobs:
       FLOWFORGE_DB_JDBC_URL: "jdbc:sqlserver://localhost:1433;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true"
       FLOWFORGE_DB_USER: sa
       FLOWFORGE_DB_PASSWORD: "FlowForge_CI_2026!Strong"
-      FLOWFORGE_TEST_RABBITMQ_URI: "amqp://flowforge:flowforge-ci@localhost:5672/"
+      FLOWFORGE_TEST_RABBITMQ_URI: "amqp://flowforge:flowforge-ci@localhost:5672/%2F"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
