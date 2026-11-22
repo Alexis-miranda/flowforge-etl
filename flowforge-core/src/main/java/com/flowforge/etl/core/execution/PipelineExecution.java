@@ -1,4 +1,3 @@
-
 package com.flowforge.etl.core.execution;
 
 import com.flowforge.etl.core.domain.PipelineStatus;
@@ -19,18 +18,33 @@ public class PipelineExecution {
     private Instant finishedAt;
 
     /**
-     * Creates a new pipeline execution in the RUNNING state.
+     * Creates a new pipeline execution with a generated identifier.
      *
      * @param pipelineId the identifier of the pipeline
      * @throws IllegalArgumentException if the pipeline ID is null or blank
      */
     public PipelineExecution(String pipelineId) {
+        this(pipelineId, UUID.randomUUID().toString());
+    }
+
+    /**
+     * Creates a new pipeline execution with a supplied identifier.
+     *
+     * @param pipelineId the identifier of the pipeline
+     * @param executionId the identifier assigned to this execution
+     * @throws IllegalArgumentException if either identifier is null or blank
+     */
+    public PipelineExecution(String pipelineId, String executionId) {
         if (pipelineId == null || pipelineId.isBlank()) {
             throw new IllegalArgumentException(
                     "Pipeline ID must not be null or blank");
         }
+        if (executionId == null || executionId.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Execution ID must not be null or blank");
+        }
 
-        this.executionId = UUID.randomUUID().toString();
+        this.executionId = executionId;
         this.pipelineId = pipelineId;
         this.status = PipelineStatus.RUNNING;
         this.startedAt = Instant.now();
@@ -83,7 +97,6 @@ public class PipelineExecution {
     public Instant finishedAt() {
         return finishedAt;
     }
-
 
     /**
      * Creates a result describing the current execution outcome.

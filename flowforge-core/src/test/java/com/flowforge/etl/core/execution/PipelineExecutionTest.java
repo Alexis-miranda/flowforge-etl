@@ -38,6 +38,28 @@ class PipelineExecutionTest {
         assertNotEquals(first.executionId(), second.executionId());
     }
 
+
+    @Test
+    void shouldUseSuppliedExecutionId() {
+        PipelineExecution execution =
+                new PipelineExecution("pipeline-1", "request-execution-123");
+
+        assertEquals("request-execution-123", execution.executionId());
+    }
+
+    @Test
+    void shouldRejectNullOrBlankExecutionId() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecution("pipeline-1", null)
+        );
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new PipelineExecution("pipeline-1", " ")
+        );
+    }
+
     @Test
     void shouldCompleteExecutionSuccessfully() {
         PipelineExecution execution =

@@ -63,6 +63,30 @@ class PipelineExecutorTest {
         assertEquals("test-pipeline", result.pipelineId());
     }
 
+
+    @Test
+    void shouldPreserveSuppliedExecutionIdInResult() {
+        PipelineExecutor executor = new PipelineExecutor(List.of());
+        PipelineDefinition pipeline = createPipeline(List.of());
+        String executionId = "request-execution-123";
+
+        PipelineExecutionResult result = executor.execute(pipeline, executionId);
+
+        assertEquals(executionId, result.executionId());
+        assertEquals(PipelineStatus.SUCCEEDED, result.status());
+    }
+
+    @Test
+    void shouldRejectBlankSuppliedExecutionId() {
+        PipelineExecutor executor = new PipelineExecutor(List.of());
+        PipelineDefinition pipeline = createPipeline(List.of());
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> executor.execute(pipeline, " ")
+        );
+    }
+
     @Test
     void shouldReturnFailedWhenNoExecutorSupportsStepType() {
         PipelineExecutor executor = new PipelineExecutor(List.of());

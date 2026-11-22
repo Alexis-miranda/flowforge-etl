@@ -39,13 +39,32 @@ public class PipelineExecutor {
         this.persistence = new PipelineExecutionPersistence(repository);
     }
 
-    /** Executes all steps in their configured order. */
+    /** Executes all steps in their configured order using a generated execution ID. */
     public PipelineExecutionResult execute(PipelineDefinition pipeline) {
-        if (pipeline == null) {
-            throw new IllegalArgumentException("Pipeline must not be null");
-        }
+        validatePipeline(pipeline);
+        return execute(pipeline, new PipelineExecution(pipeline.id()));
+    }
 
-        PipelineExecution execution = new PipelineExecution(pipeline.id());
+    /**
+     * Executes all steps in their configured order using the supplied execution ID.
+     *
+     * <p>This overload allows an external request identifier to be preserved
+     * in execution results and persistence records.</p>
+     *
+     * @param pipeline pipeline definition to execute
+     * @param executionId externally assigned execution identifier
+     * @return final execution result
+     */
+    public PipelineExecutionResult execute(
+            PipelineDefinition pipeline,
+            String executionId) {
+        validatePipeline(pipeline);
+        return execute(pipeline, new PipelineExecution(pipeline.id(), executionId));
+    }
+
+    private PipelineExecutionResult execute(
+            PipelineDefinition pipeline,
+            PipelineExecution execution) {
         PipelineExecutionContext context = new PipelineExecutionContext();
         StepExecutionHistory history = new StepExecutionHistory();
 
@@ -76,6 +95,12 @@ public class PipelineExecutor {
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
         return persistence.persistResult(toResult(execution, null, null, history));
+    }
+
+    private void validatePipeline(PipelineDefinition pipeline) {
+        if (pipeline == null) {
+            throw new IllegalArgumentException("Pipeline must not be null");
+        }
     }
 
     private PipelineExecutionResult failExecution(
