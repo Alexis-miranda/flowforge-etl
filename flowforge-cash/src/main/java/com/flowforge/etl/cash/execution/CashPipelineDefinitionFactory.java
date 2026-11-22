@@ -33,11 +33,31 @@ public final class CashPipelineDefinitionFactory {
             String columns,
             String sourceFile) {
 
+        return create(
+                "cash-" + UUID.randomUUID(),
+                input, backOfficeCode, outputDirectory, columns, sourceFile);
+    }
+
+    /**
+     * Builds a Cash ETL pipeline with a caller-supplied stable pipeline ID.
+     * Use a stable ID when a pipeline definition is reconstructed from a
+     * redelivered asynchronous request.
+     */
+    public static PipelineDefinition create(
+            String pipelineId,
+            Path input,
+            String backOfficeCode,
+            Path outputDirectory,
+            String columns,
+            String sourceFile) {
+        if (pipelineId == null || pipelineId.isBlank()) {
+            throw new IllegalArgumentException("Pipeline ID must not be blank");
+        }
+
         String timestamp = LocalDateTime.now().format(TIMESTAMP);
-        String runId = UUID.randomUUID().toString();
 
         return new PipelineDefinition(
-                "cash-" + runId,
+                pipelineId,
                 "Cash ETL",
                 "Extract, validate, prepare, persist and publish FRONT Cash CSV",
                 List.of(
