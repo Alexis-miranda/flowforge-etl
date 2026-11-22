@@ -73,13 +73,12 @@ public final class PipelineStepRecoveryEvaluator {
             if (persisted == null || persisted.status() == PersistedStepExecutionStatus.SKIPPED) {
                 assessments.add(new StepRecoveryAssessment(
                         step.id(),
-                        PersistedStepExecutionStatus.SKIPPED,
+                        PersistedStepExecutionStatus.NOT_STARTED,
                         policy,
                         StepRecoveryAction.NOT_STARTED,
-                        "The step has no completed execution record and has not run in this execution"));
+                        "No execution was started for this step in the observed run"));
                 continue;
             }
-
             assessments.add(assess(step.id(), persisted, policy));
         }
         return List.copyOf(assessments);
@@ -99,7 +98,8 @@ public final class PipelineStepRecoveryEvaluator {
                     StepRecoveryAction.RECONCILIATION_REQUIRED,
                     "The worker may have performed an external side effect before interruption");
             case FAILED -> assessFailure(stepId, persisted, policy);
-            case SKIPPED -> throw new IllegalStateException("Skipped steps are assessed as not started");
+            case SKIPPED, NOT_STARTED -> throw new IllegalStateException(
+                    "Non-executed steps are assessed as not started");
         };
     }
 
