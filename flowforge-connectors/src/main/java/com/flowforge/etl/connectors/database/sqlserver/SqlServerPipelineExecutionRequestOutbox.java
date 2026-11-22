@@ -112,6 +112,40 @@ public final class SqlServerPipelineExecutionRequestOutbox
         }
     }
 
+
+    @Override
+    public java.util.Optional<com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus>
+    findRequestStatus(UUID executionId) {
+        Objects.requireNonNull(executionId, "Execution ID must not be null");
+        String sql = """
+                SELECT r.PipelineType, r.RequestedAt, o.Status,
+                       o.PublishAttempts, o.LastError
+                FROM dbo.ETLPipelineExecutionRequest r
+                INNER JOIN dbo.ETLOutboxMessage o ON o.ExecutionId = r.ExecutionId
+                WHERE r.ExecutionId = ?
+                """;
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
+             PreparedStatement statement = connection.prepareStatement(sql)) {
+            statement.setString(1, executionId.toString());
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (!resultSet.next()) {
+                    return java.util.Optional.empty();
+                }
+                return java.util.Optional.of(
+                        new com.flowforge.etl.messaging.outbox.PipelineExecutionRequestStatus(
+                                executionId,
+                                resultSet.getString("PipelineType"),
+                                resultSet.getString("Status"),
+                                resultSet.getTimestamp("RequestedAt").toInstant(),
+                                resultSet.getInt("PublishAttempts"),
+                                resultSet.getString("LastError")));
+            }
+        } catch (SQLException exception) {
+            throw new IllegalStateException(
+                    "Could not find pipeline execution request status", exception);
+        }
+    }
+
     @Override
     public List<PipelineExecutionOutboxMessage> findPending(int batchSize) {
         if (batchSize < 1) {
