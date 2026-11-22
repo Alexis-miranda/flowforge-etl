@@ -63,6 +63,15 @@ class FlowForgeApiServerTest {
             assertEquals("QUEUED", response.get("status").asText());
             assertNotNull(outbox.enqueued);
 
+            HttpResponse<String> recent = client.send(
+                    HttpRequest.newBuilder(base.resolve("/api/executions?limit=10")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, recent.statusCode());
+            JsonNode recentResponse = mapper.readTree(recent.body());
+            assertEquals(1, recentResponse.size());
+            assertEquals(executionId, recentResponse.get(0).get("executionId").asText());
+            assertEquals("QUEUED", recentResponse.get(0).get("status").asText());
+
             HttpResponse<String> status = client.send(
                     HttpRequest.newBuilder(base.resolve(
                             "/api/executions/" + executionId)).GET().build(),
@@ -102,6 +111,16 @@ class FlowForgeApiServerTest {
         @Override
         public boolean recordPublishFailure(UUID messageId, String errorMessage) {
             return false;
+        }
+
+        @Override
+        public List<PipelineExecutionRequestStatus> findRecentRequests(int limit) {
+            if (enqueued == null) {
+                return List.of();
+            }
+            return List.of(new PipelineExecutionRequestStatus(
+                    enqueued.executionId(), enqueued.pipelineType(), "PENDING",
+                    enqueued.requestedAt(), 0, null));
         }
 
         @Override
