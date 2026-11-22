@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp,
-  Clock3, Database, FileClock, LayoutDashboard, Menu, Play,
-  Plus, Settings2, ShieldCheck, Sparkles, Workflow, X
+  Clock3, Database, FileClock, LayoutDashboard, Menu,
+  Plus, Settings2, ShieldCheck, Sparkles, Workflow
 } from 'lucide-react';
 import { Metric } from './components/Metric';
 import { ExecutionsTable, type Run } from './features/executions/ExecutionsTable';
 import { ExecutionDetails } from './features/executions/ExecutionDetails';
+import { NewExecutionModal, type NewExecutionInput } from './features/executions/NewExecutionModal';
 
 const seedRuns: Run[] = [
   { id:'EX-2048', pipeline:'Cash reconciliation', source:'cash_2026-11-22.csv', started:'Today, 10:42:18', duration:'02m 14s', status:'Succeeded', rows:'24,891' },
@@ -18,9 +19,9 @@ const seedRuns: Run[] = [
 ];
 export default function App(){
   const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
-  const [source,setSource]=useState(''); const [backOffice,setBackOffice]=useState('BNYM'); const [output,setOutput]=useState('/data/output'); const [notice,setNotice]=useState('');
+  const [notice,setNotice]=useState('');
   const filtered=useMemo(()=>runs.filter(r=>(filter==='All runs'||r.status===filter)&&[r.id,r.source,r.pipeline].join(' ').toLowerCase().includes(query.toLowerCase())),[runs,filter,query]);
-  const launch=()=>{if(!source.trim()){setNotice('Choose an input file path to continue.');return;}const run:Run={id:'EX-'+(2050+runs.length),pipeline:'Cash reconciliation',source:source.split('/').pop()||source,started:'Just now',duration:'—',status:'Running',rows:'—'};setRuns([run,...runs]);setSelected(run);setModal(false);setNotice('Demo execution created locally. API integration is the next step.');setSource('');};
+  const launch=({source}:NewExecutionInput)=>{const run:Run={id:'EX-'+(2050+runs.length),pipeline:'Cash reconciliation',source:source.split('/').pop()||source,started:'Just now',duration:'—',status:'Running',rows:'—'};setRuns([run,...runs]);setSelected(run);setModal(false);setNotice('Demo execution created locally. API integration is the next step.');};
   return <div className="shell">
     <aside className="sidebar">
       <div className="brand"><div className="brand-mark"><Workflow size={19}/></div><span>flowforge</span><small>ETL</small></div>
@@ -51,6 +52,6 @@ export default function App(){
     </main>
     {selected && <ExecutionDetails run={selected} onClose={() => setSelected(null)} />}
 
-    {modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>New pipeline run</h2><p>Configure and start a Cash reconciliation run.</p></div><button className="icon-btn" onClick={()=>setModal(false)}><X size={17}/></button></div><label>Pipeline</label><div className="pipeline-select"><Workflow size={16}/> Cash reconciliation <span>Active</span></div><label>Input file path</label><input className="form-input" value={source} onChange={e=>setSource(e.target.value)} placeholder="/shared/input/cash-file.csv"/><label>Back office code</label><input className="form-input" value={backOffice} onChange={e=>setBackOffice(e.target.value)} placeholder="BNYM"/><label>Output directory</label><input className="form-input" value={output} onChange={e=>setOutput(e.target.value)}/><p className="modal-note">Demo only — this form creates a local sample execution. It does not submit to the backend yet.</p>{notice&&<div className="notice">{notice}</div>}<div className="modal-actions"><button className="secondary" onClick={()=>setModal(false)}>Cancel</button><button className="primary" onClick={launch}><Play size={15}/> Start demo run</button></div></div></div>}
+    <NewExecutionModal open={modal} notice={notice} onClose={() => setModal(false)} onCreate={launch} />
   </div>
 }
