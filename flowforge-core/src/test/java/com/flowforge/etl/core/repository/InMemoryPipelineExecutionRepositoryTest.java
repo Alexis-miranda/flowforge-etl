@@ -252,6 +252,72 @@ class InMemoryPipelineExecutionRepositoryTest {
 
 
     @Test
+    void shouldReturnFalseWhenExecutionIdWasAlreadyClaimed() {
+        Instant startedAt = Instant.parse("2026-01-01T10:00:00Z");
+        PipelineExecutionSnapshot snapshot =
+                new PipelineExecutionSnapshot(
+                        "execution-claim",
+                        "pipeline-claim",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        startedAt,
+                        null);
+
+        assertTrue(repository.tryStart(snapshot));
+        assertFalse(repository.tryStart(snapshot));
+        assertEquals(
+                Optional.of(snapshot),
+                repository.findSnapshotByExecutionId("execution-claim"));
+    }
+
+    @Test
+    void shouldAllowOnlyOneConcurrentExecutionClaim() throws Exception {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+        PipelineExecutionSnapshot snapshot =
+                new PipelineExecutionSnapshot(
+                        "execution-concurrent-claim",
+                        "pipeline-claim",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        Instant.parse("2026-01-01T10:00:00Z"),
+                        null);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Boolean> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return repository.tryStart(snapshot);
+            });
+            Future<Boolean> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return repository.tryStart(snapshot);
+            });
+
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            assertNotEquals(
+                    first.get(5, TimeUnit.SECONDS),
+                    second.get(5, TimeUnit.SECONDS));
+            assertEquals(
+                    1,
+                    repository.findSnapshotsByPipelineId("pipeline-claim")
+                            .size());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void shouldRejectConcurrentDuplicateSaves() throws Exception {
         InMemoryPipelineExecutionRepository repository =
                 new InMemoryPipelineExecutionRepository();

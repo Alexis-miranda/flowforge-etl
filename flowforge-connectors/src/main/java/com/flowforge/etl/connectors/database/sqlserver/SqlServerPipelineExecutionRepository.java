@@ -85,6 +85,23 @@ public final class SqlServerPipelineExecutionRepository
 
     @Override
     public void start(PipelineExecutionSnapshot snapshot) {
+        if (!tryStart(snapshot)) {
+            throw new IllegalStateException(
+                    "Execution audit record already exists: "
+                            + snapshot.executionId());
+        }
+    }
+
+    /**
+     * Uses the database primary key as the atomic arbitration point. No
+     * pre-check is performed, so concurrent workers cannot both claim an ID.
+     */
+    @Override
+    public boolean tryStart(PipelineExecutionSnapshot snapshot) {
+        if (snapshot == null) {
+            throw new IllegalArgumentException(
+                    "Execution snapshot must not be null");
+        }
         if (snapshot.status() != PipelineStatus.RUNNING) {
             throw new IllegalArgumentException(
                     "Initial execution snapshot must have RUNNING status");
@@ -97,11 +114,27 @@ public final class SqlServerPipelineExecutionRepository
 
             bindSnapshot(statement, snapshot);
             statement.executeUpdate();
+            return true;
         } catch (SQLException exception) {
+            if (isDuplicateKey(exception)) {
+                return false;
+            }
             throw new IllegalStateException(
                     "Could not start pipeline execution audit record",
                     exception);
         }
+    }
+
+    private static boolean isDuplicateKey(SQLException exception) {
+        for (SQLException current = exception;
+             current != null;
+             current = current.getNextException()) {
+            if (current.getErrorCode() == 2601
+                    || current.getErrorCode() == 2627) {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override

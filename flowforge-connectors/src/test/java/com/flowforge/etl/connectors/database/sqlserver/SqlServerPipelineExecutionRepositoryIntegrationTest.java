@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,6 +44,9 @@ class SqlServerPipelineExecutionRepositoryIntegrationTest {
 
         // Insert the initial RUNNING record.
         repository.start(running);
+
+        // A repeated claim must be reported as a duplicate, not a SQL failure.
+        assertFalse(repository.tryStart(running));
 
         List<PipelineExecutionSnapshot> runningHistory =
                 repository.findSnapshotsByPipelineId(pipelineId);

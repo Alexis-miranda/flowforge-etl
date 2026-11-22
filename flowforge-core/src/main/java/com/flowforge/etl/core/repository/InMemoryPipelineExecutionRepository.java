@@ -26,6 +26,15 @@ public class InMemoryPipelineExecutionRepository
 
     @Override
     public synchronized void start(PipelineExecutionSnapshot snapshot) {
+        if (!tryStart(snapshot)) {
+            throw new IllegalArgumentException(
+                    "Execution snapshot already exists: "
+                            + snapshot.executionId());
+        }
+    }
+
+    @Override
+    public synchronized boolean tryStart(PipelineExecutionSnapshot snapshot) {
         if (snapshot == null) {
             throw new IllegalArgumentException(
                     "Execution snapshot must not be null");
@@ -38,12 +47,11 @@ public class InMemoryPipelineExecutionRepository
         }
 
         if (snapshots.containsKey(snapshot.executionId())) {
-            throw new IllegalArgumentException(
-                    "Execution snapshot already exists: "
-                            + snapshot.executionId());
+            return false;
         }
 
         snapshots.put(snapshot.executionId(), snapshot);
+        return true;
     }
 
     @Override
