@@ -89,7 +89,8 @@ jobs:
             docs/cash/sql/06-cash-output-delivery-schema.sql \
             docs/cash/sql/07-etl-execution-schema.sql \
             docs/cash/sql/08-cash-output-artifact-metadata.sql \
-            docs/sql/05-pipeline-step-execution-schema.sql; do
+            docs/sql/05-pipeline-step-execution-schema.sql \
+            docs/sql/06-pipeline-request-outbox-schema.sql; do
             file_name="$(basename "$script")"
             docker cp "$script" "$container_id:/tmp/$file_name"
             docker exec "$container_id" /opt/mssql-tools18/bin/sqlcmd \
