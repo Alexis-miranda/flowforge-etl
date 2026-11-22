@@ -3,6 +3,7 @@ package com.flowforge.etl.core.repository;
 
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.PersistedStepExecution;
 import com.flowforge.etl.core.execution.StepExecutionRecord;
 import java.time.Instant;
 
@@ -79,6 +80,9 @@ public interface PipelineExecutionRepository {
      */
     Optional<PipelineExecutionSnapshot> findSnapshotByExecutionId(
             String executionId);
+
+    /** Finds persisted step states for one execution, ordered by step start time. */
+    List<PersistedStepExecution> findStepExecutions(String executionId);
 
     /**
      * Finds all execution results associated with a pipeline.
