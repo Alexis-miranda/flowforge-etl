@@ -87,7 +87,8 @@ jobs:
             docs/cash/sql/04-cash-master-audit-schema.sql \
             docs/cash/sql/05-cash-load-control-schema.sql \
             docs/cash/sql/06-cash-output-delivery-schema.sql \
-            docs/cash/sql/07-etl-execution-schema.sql; do
+            docs/cash/sql/07-etl-execution-schema.sql \
+            docs/cash/sql/08-cash-output-artifact-metadata.sql; do
             file_name="$(basename "$script")"
             docker cp "$script" "$container_id:/tmp/$file_name"
             docker exec "$container_id" /opt/mssql-tools18/bin/sqlcmd \
