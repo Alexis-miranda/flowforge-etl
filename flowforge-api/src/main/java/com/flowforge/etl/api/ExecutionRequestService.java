@@ -35,6 +35,13 @@ public final class ExecutionRequestService {
                         "Parameter keys must be non-blank and values must not be null");
             }
         });
+        for (String required : java.util.List.of("input", "backOfficeCode", "outputDirectory")) {
+            String value = parameters.get(required);
+            if (value == null || value.isBlank()) {
+                throw new IllegalArgumentException(
+                        "Missing required Cash request parameter: " + required);
+            }
+        }
 
         PipelineExecutionRequest request = new PipelineExecutionRequest(
                 UUID.randomUUID(), pipelineType, parameters, clock.instant());
