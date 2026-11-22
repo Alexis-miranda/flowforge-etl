@@ -23,21 +23,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SqlServerCashOutputDeliveryRepositoryIntegrationTest {
 
     @Test
-    void shouldRejectStaleLeaseForDeliveryStateAndErrorUpdates() throws Exception {
-        Assumptions.assumeTrue(
-                SqlServerConnectionFactory.isConfigured(),
+    void shouldRejectStaleLeaseAndPersistOnlyCurrentArtifactReference() throws Exception {
+        Assumptions.assumeTrue(SqlServerConnectionFactory.isConfigured(),
                 "SQL Server integration test requires database environment variables");
 
         String executionId = UUID.randomUUID().toString();
         String sourceFile = "lease-fence-" + UUID.randomUUID() + ".csv";
-        byte[] payload = "accountCode,amount\nACC001,10.00\n"
-                .getBytes(StandardCharsets.UTF_8);
+        byte[] payload = "accountCode,amount\nACC001,10.00\n".getBytes(StandardCharsets.UTF_8);
         String hash = HexFormat.of().formatHex(
                 MessageDigest.getInstance("SHA-256").digest(payload));
+        String stalePath = "/tmp/stale-artifact.csv";
+        String currentPath = "/tmp/current-artifact.csv";
 
         insertRunningExecution(executionId);
         insertPendingDelivery(sourceFile, payload, hash);
-
         SqlServerPipelineExecutionLeaseRepository leases =
                 new SqlServerPipelineExecutionLeaseRepository();
         SqlServerCashOutputDeliveryRepository deliveries =
@@ -46,31 +45,31 @@ class SqlServerCashOutputDeliveryRepositoryIntegrationTest {
         try {
             PipelineExecutionLease staleLease = leases.tryAcquire(
                     executionId, "worker-old", Duration.ofSeconds(30)).orElseThrow();
-
             assertTrue(leases.release(staleLease));
-
             PipelineExecutionLease currentLease = leases.tryAcquire(
                     executionId, "worker-current", Duration.ofSeconds(30)).orElseThrow();
             assertTrue(currentLease.fencingToken() > staleLease.fencingToken());
 
-            assertFalse(deliveries.markPublished(sourceFile, staleLease));
-            assertFalse(deliveries.recordError(
-                    sourceFile, "stale worker error", staleLease));
+            assertFalse(deliveries.markPublished(
+                    sourceFile, staleLease, stalePath, hash));
+            assertFalse(deliveries.recordError(sourceFile, "stale worker error", staleLease));
+            assertTrue(deliveries.markPublished(
+                    sourceFile, currentLease, currentPath, hash));
 
-            assertTrue(deliveries.markPublished(sourceFile, currentLease));
-
-            try (Connection connection =
-                         SqlServerConnectionFactory.openConnection();
+            try (Connection connection = SqlServerConnectionFactory.openConnection();
                  PreparedStatement statement = connection.prepareStatement("""
-                         SELECT DeliveryStatus, LastError
-                         FROM dbo.CashOutputDelivery
-                         WHERE SourceFile = ?
+                         SELECT DeliveryStatus, LastError, PublishedPath,
+                                PublishedSha256, PublishedExecutionId
+                         FROM dbo.CashOutputDelivery WHERE SourceFile = ?
                          """)) {
                 statement.setString(1, sourceFile);
                 try (ResultSet result = statement.executeQuery()) {
                     assertTrue(result.next());
                     assertEquals("PUBLISHED", result.getString("DeliveryStatus"));
                     assertNull(result.getString("LastError"));
+                    assertEquals(currentPath, result.getString("PublishedPath"));
+                    assertEquals(hash, result.getString("PublishedSha256").trim());
+                    assertEquals(executionId, result.getString("PublishedExecutionId"));
                 }
             }
         } finally {
@@ -79,11 +78,9 @@ class SqlServerCashOutputDeliveryRepositoryIntegrationTest {
     }
 
     private static void insertRunningExecution(String executionId) throws Exception {
-        try (Connection connection =
-                     SqlServerConnectionFactory.openConnection();
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
-                     INSERT INTO dbo.ETLExecution
-                         (ExecutionId, PipelineId, Status, StartedAt)
+                     INSERT INTO dbo.ETLExecution (ExecutionId, PipelineId, Status, StartedAt)
                      VALUES (?, ?, N'RUNNING', SYSUTCDATETIME())
                      """)) {
             statement.setString(1, executionId);
@@ -92,16 +89,14 @@ class SqlServerCashOutputDeliveryRepositoryIntegrationTest {
         }
     }
 
-    private static void insertPendingDelivery(
-            String sourceFile, byte[] payload, String hash) throws Exception {
-        try (Connection connection =
-                     SqlServerConnectionFactory.openConnection();
+    private static void insertPendingDelivery(String sourceFile, byte[] payload, String hash)
+            throws Exception {
+        try (Connection connection = SqlServerConnectionFactory.openConnection();
              PreparedStatement statement = connection.prepareStatement("""
                      INSERT INTO dbo.CashOutputDelivery
-                         (SourceFile, BackOfficeCode, OutputFileName,
-                          OutputDirectory, CsvPayload, PayloadSha256, DeliveryStatus)
-                     VALUES (?, N'TEST', N'fenced-output.csv', N'.',
-                             ?, ?, N'PENDING')
+                         (SourceFile, BackOfficeCode, OutputFileName, OutputDirectory,
+                          CsvPayload, PayloadSha256, DeliveryStatus)
+                     VALUES (?, N'TEST', N'fenced-output.csv', N'.', ?, ?, N'PENDING')
                      """)) {
             statement.setString(1, sourceFile);
             statement.setBytes(2, payload);
@@ -111,8 +106,7 @@ class SqlServerCashOutputDeliveryRepositoryIntegrationTest {
     }
 
     private static void deleteTestRows(String sourceFile, String executionId) {
-        try (Connection connection =
-                     SqlServerConnectionFactory.openConnection()) {
+        try (Connection connection = SqlServerConnectionFactory.openConnection()) {
             try (PreparedStatement delivery = connection.prepareStatement(
                     "DELETE FROM dbo.CashOutputDelivery WHERE SourceFile = ?")) {
                 delivery.setString(1, sourceFile);

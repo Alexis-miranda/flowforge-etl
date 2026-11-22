@@ -36,7 +36,7 @@ The Cash pipeline is composed from five ordered steps:
 2. **Validate** — separates accepted and rejected records and records rejection reasons. Amounts must be numeric and zero or positive; negative amounts are rejected.
 3. **Prepare** — prepares the FRONT CSV payload using the configured back-office code, output columns, and output directory.
 4. **Persist** — stores accepted records, rejected records, original-row audit data, load-control information, and a pending output delivery in SQL Server.
-5. **Publish** — publishes the prepared FRONT CSV to the configured local output directory and updates delivery state.
+5. **Publish** — writes an immutable FRONT CSV artifact under `.flowforge-artifacts/<execution-hash>/` and atomically records its path, SHA-256, and execution ID in SQL Server. The database reference is authoritative; artifacts from stale or losing workers may remain unreferenced and require later cleanup.
 
 The workflow also has a recovery CLI that retries pending local output deliveries without reloading the original source data.
 

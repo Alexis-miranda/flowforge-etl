@@ -61,6 +61,18 @@ class PipelineExecutorFactoryTest {
         }
 
         @Override
+        public boolean markPublished(String sourceFile, String executionId,
+                                     String publishedPath, String publishedSha256) {
+            return true;
+        }
+
+        @Override
+        public boolean markPublished(String sourceFile, PipelineExecutionLease lease,
+                                     String publishedPath, String publishedSha256) {
+            return true;
+        }
+
+        @Override
         public boolean markPublished(
                 String sourceFile, PipelineExecutionLease lease) {
             return false;

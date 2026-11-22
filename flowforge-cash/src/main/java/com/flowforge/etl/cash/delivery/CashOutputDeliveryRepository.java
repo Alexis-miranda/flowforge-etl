@@ -1,39 +1,31 @@
 package com.flowforge.etl.cash.delivery;
 
 import com.flowforge.etl.core.execution.PipelineExecutionLease;
-
 import java.util.List;
 
-/**
- * Persistence operations required by cash output delivery workflows.
- */
+/** Persistence operations required by cash output delivery workflows. */
 public interface CashOutputDeliveryRepository {
-
     List<String> findPendingSources();
-
     CashOutputDelivery findBySourceFile(String sourceFile);
-
-    /** Marks a delivery as published for a locally managed execution. */
     void markPublished(String sourceFile);
 
     /**
-     * Marks a delivery as published only while the supplied execution lease
-     * remains current in the authoritative store.
-     *
-     * @return true when the pending delivery was updated; false when the lease
-     *         is stale or the delivery is no longer pending
+     * Stores the immutable artifact reference for a local execution.
+     * Implementations should atomically update only a PENDING delivery.
      */
+    boolean markPublished(String sourceFile, String executionId,
+                          String publishedPath, String publishedSha256);
+
+    /** Marks a delivery as published only while the supplied lease remains current. */
     boolean markPublished(String sourceFile, PipelineExecutionLease lease);
 
-    /** Records an error for a locally managed execution. */
-    void recordError(String sourceFile, String message);
-
     /**
-     * Records an error only while the supplied execution lease remains current.
-     *
-     * @return true when the pending delivery was updated; false when the lease
-     *         is stale or the delivery is no longer pending
+     * Stores the artifact reference only while the supplied lease remains current.
+     * Implementations must evaluate the lease predicate in the same update.
      */
-    boolean recordError(
-            String sourceFile, String message, PipelineExecutionLease lease);
+    boolean markPublished(String sourceFile, PipelineExecutionLease lease,
+                          String publishedPath, String publishedSha256);
+
+    void recordError(String sourceFile, String message);
+    boolean recordError(String sourceFile, String message, PipelineExecutionLease lease);
 }

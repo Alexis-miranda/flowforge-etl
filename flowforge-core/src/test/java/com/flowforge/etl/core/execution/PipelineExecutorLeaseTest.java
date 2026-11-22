@@ -23,6 +23,7 @@ class PipelineExecutorLeaseTest {
                 7L);
         AtomicReference<PipelineExecutionLease> observedLease =
                 new AtomicReference<>();
+        AtomicReference<String> observedExecutionId = new AtomicReference<>();
 
         StepExecutor executor = new StepExecutor() {
             @Override
@@ -35,6 +36,7 @@ class PipelineExecutorLeaseTest {
                     PipelineStep step,
                     PipelineExecutionContext context) {
                 observedLease.set(context.executionLease().orElseThrow());
+                observedExecutionId.set(context.executionId().orElseThrow());
             }
         };
 
@@ -43,6 +45,7 @@ class PipelineExecutorLeaseTest {
                 pipelineWithOneExtractStep(), lease);
 
         assertEquals("execution-123", result.executionId());
+        assertEquals("execution-123", observedExecutionId.get());
         assertEquals(lease, observedLease.get());
         assertEquals(7L, observedLease.get().fencingToken());
     }
@@ -52,6 +55,28 @@ class PipelineExecutorLeaseTest {
         PipelineExecutionContext context = new PipelineExecutionContext();
 
         assertEquals(Optional.empty(), context.executionLease());
+        assertEquals(Optional.empty(), context.executionId());
+    }
+
+    @Test
+    void shouldExposeGeneratedExecutionIdToLocallyManagedSteps() {
+        AtomicReference<String> observedExecutionId = new AtomicReference<>();
+        StepExecutor stepExecutor = new StepExecutor() {
+            @Override
+            public StepType supportedType() {
+                return StepType.EXTRACT;
+            }
+
+            @Override
+            public void execute(PipelineStep step, PipelineExecutionContext context) {
+                observedExecutionId.set(context.executionId().orElseThrow());
+            }
+        };
+
+        PipelineExecutionResult result =
+                new PipelineExecutor(List.of(stepExecutor)).execute(pipelineWithOneExtractStep());
+
+        assertEquals(result.executionId(), observedExecutionId.get());
     }
 
     @Test
