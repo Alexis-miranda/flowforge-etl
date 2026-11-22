@@ -55,7 +55,7 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - Local output delivery tracking, integrity verification, and recovery.
 - Reusable SFTP file reader and writer with SSH host-key verification.
 - Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.
-- A bounded outbox dispatcher, RabbitMQ publisher, manual-ack request consumer, lease-protected request handler with periodic lease renewal, and a concrete Cash request-to-pipeline resolver.
+- A bounded outbox dispatcher, RabbitMQ publisher, manual-ack request consumer, lease-protected request handler with periodic lease renewal, a concrete Cash request-to-pipeline resolver, and a managed Cash worker entry point.
 - Unit tests, filesystem-based integration tests, and SQL Server integration tests.
 
 ## Architecture
@@ -66,7 +66,7 @@ The project is organized as a Maven multi-module application:
 | --- | --- |
 | `flowforge-core` | Pipeline domain model, execution engine, step executor registry, execution context, execution history, and repository abstractions. |
 | `flowforge-connectors` | Reusable CSV, SQL Server, and SFTP infrastructure connectors, including SQL Server execution-history persistence. |
-| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, CLI entry points, and resolution of asynchronous Cash requests. |
+| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, CLI entry points, asynchronous request resolution, and the Cash worker entry point. |
 | `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, lease-protected request handler, bounded outbox dispatcher, and transactional outbox port. |
 
 The core module does not depend on the Cash workflow. The Cash module composes the generic engine with the required connectors and business-specific steps.
@@ -148,13 +148,34 @@ Provide a unique `sourceFile` identifier for each distinct input batch. Reusing 
 
 The recovery entry point is `com.flowforge.etl.cash.cli.CashOutputRecoveryCli`. It retries pending local output deliveries from SQL Server.
 
+## Run the asynchronous Cash worker
+
+The worker entry point is `com.flowforge.etl.cash.worker.CashPipelineWorker`. It declares a durable queue, consumes requests with manual acknowledgements, composes the SQL Server repositories with the Cash pipeline resolver, and renews execution leases while a request is running.
+
+Configure the following process environment variables before starting it:
+
+- `FLOWFORGE_DB_JDBC_URL`, `FLOWFORGE_DB_USER`, `FLOWFORGE_DB_PASSWORD` — required SQL Server connection settings.
+- `FLOWFORGE_RABBITMQ_URI` — required RabbitMQ connection URI.
+- `FLOWFORGE_RABBITMQ_QUEUE` — queue name; defaults to `flowforge.pipeline.requests`.
+- `FLOWFORGE_WORKER_ID` — optional worker owner identifier; a unique process identifier is generated when omitted.
+- `FLOWFORGE_WORKER_PREFETCH` — optional positive prefetch count; defaults to `1`.
+- `FLOWFORGE_WORKER_LEASE_SECONDS` — optional lease duration in seconds; defaults to `90`.
+- `FLOWFORGE_WORKER_LEASE_RENEWAL_SECONDS` — optional renewal interval in seconds; defaults to `20` and must be shorter than the lease.
+- `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` — optional dead-letter exchange configured on the durable queue.
+
+The worker uses RabbitMQ's default exchange: the publisher must send to exchange `""` with the configured queue name as its routing key. The worker does not provision RabbitMQ or SQL Server. The database schema listed above must already be installed.
+
+Each request carries an input-file path, not the file itself. The path must resolve to a readable regular file on the worker host, and the worker must have access to the output directory as well. For multiple worker machines, use a shared filesystem or another explicit file-transfer mechanism; local paths on the producer host are not automatically visible to a remote worker.
+
+The worker cancels its consumer on shutdown, waits for in-flight request handlers, stops lease renewal, and then closes its broker resources. This is an initial application lifecycle, not a production deployment recipe. Retry backoff and dead-letter operations still require an operational queue policy; handler failures are currently requeued by the consumer and may be redelivered repeatedly. Do not treat this worker as production-ready without addressing that policy and validating fencing at every side-effect boundary.
+
 ## Project status and boundaries
 
 **Current milestone: functional Cash ETL workflow.** The generic pipeline engine, CSV processing, Cash validation, SQL Server persistence, audit history, execution history, local output publication, delivery tracking, and recovery are implemented and covered by automated tests.
 
 The following capabilities are **not currently implemented or integrated**:
 
-- A continuously running dispatcher/worker application and production-ready end-to-end asynchronous execution. A lease-protected handler now resolves requests through an injected pipeline resolver, acquires and periodically renews an execution lease, preserves the request execution ID, and invokes the pipeline executor. The executor stops between steps when renewal is lost. Long-running step implementations must also check the execution-context guard before irreversible work; fencing-token validation remains required at side-effect boundaries. A concrete Cash pipeline resolver, worker lifecycle, and operational retry/dead-letter policies remain to be wired.
+- Production-ready end-to-end asynchronous execution. The repository now includes a Cash worker entry point that composes the resolver, SQL Server repositories, RabbitMQ consumer, and lease renewal. Operational retry backoff, dead-letter handling, deployment, observability, and end-to-end validation against real broker/database environments remain outstanding. Long-running step implementations must check the execution-context guard before irreversible work; fencing-token validation remains required at side-effect boundaries.
 - Kafka messaging.
 - A REST API or Spring Boot service interface.
 - SFTP publication from the Cash workflow.
@@ -166,7 +187,9 @@ This is a personal development project, not a production-certified system. Befor
 
 - [ ] Confirm the official output-file specification and production mappings.
 - [ ] Add further transformation types where required by real workflows.
-- [ ] Compose the concrete Cash resolver, SQL Server repositories, RabbitMQ connection/topology, and consumer into a managed worker lifecycle; add cooperative cancellation checks inside long-running steps and verify fencing at every side-effect boundary.
+- [ ] Define and test retry backoff, dead-letter handling, and poison-message operations for the asynchronous worker.
+- [ ] Add cooperative cancellation checks inside long-running steps and verify fencing at every side-effect boundary.
+- [ ] Add end-to-end tests against disposable RabbitMQ and SQL Server services.
 - [ ] Evaluate a REST interface and service deployment.
 - [ ] Integrate SFTP delivery into the Cash workflow.
 
