@@ -92,6 +92,7 @@ public final class CashPipelineWorker implements AutoCloseable {
             connectionFactory.setRequestedHeartbeat(30);
             connection = connectionFactory.newConnection(workerId);
             channel = connection.createChannel();
+            channel.confirmSelect();
 
             Map<String, Object> queueArguments = new HashMap<>();
             String deadLetterExchange = System.getenv(
