@@ -21,6 +21,7 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -177,7 +178,7 @@ public final class CashPipelineWorker implements AutoCloseable {
         System.out.println("FlowForge Cash worker is consuming requests. "
                 + "Press Ctrl+C to stop.");
         try {
-            Thread.currentThread().join();
+            new CountDownLatch(1).await();
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             worker.close();
@@ -257,13 +258,16 @@ public final class CashPipelineWorker implements AutoCloseable {
         }
 
         private synchronized void awaitIdle() {
+            boolean interrupted = false;
             while (activeRequests > 0) {
                 try {
                     wait();
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return;
+                } catch (InterruptedException ignored) {
+                    interrupted = true;
                 }
+            }
+            if (interrupted) {
+                Thread.currentThread().interrupt();
             }
         }
     }
