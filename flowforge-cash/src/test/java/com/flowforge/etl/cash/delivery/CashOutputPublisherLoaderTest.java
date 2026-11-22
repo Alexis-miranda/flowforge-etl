@@ -238,6 +238,20 @@ class CashOutputPublisherLoaderTest {
         }
 
         @Override
+        public boolean markPublished(String sourceFile, String executionId,
+                                     String publishedPath, String publishedSha256) {
+            markPublishedCalls++;
+            return !failMarkPublished;
+        }
+
+        @Override
+        public boolean markPublished(String sourceFile, PipelineExecutionLease lease,
+                                     String publishedPath, String publishedSha256) {
+            fencedMarkPublishedCalls++;
+            return fencedMarkPublishedResult;
+        }
+
+        @Override
         public boolean markPublished(
                 String sourceFile, PipelineExecutionLease lease) {
             fencedMarkPublishedCalls++;
