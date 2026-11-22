@@ -4,6 +4,7 @@ import com.flowforge.etl.core.domain.PipelineStep;
 import com.flowforge.etl.core.domain.StepConfiguration;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutionContext;
+import com.flowforge.etl.core.execution.PipelineExecutionLease;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -14,6 +15,7 @@ import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -137,6 +139,48 @@ class CashOutputPublisherLoaderTest {
         assertEquals(0, repository.recordErrorCalls);
     }
 
+
+    @Test
+    void shouldUseFencedRepositoryUpdatesWhenExecutionHasLease() throws Exception {
+        byte[] payload = "lease-owned".getBytes(StandardCharsets.UTF_8);
+        FakeRepository repository = new FakeRepository(
+                delivery("output.csv", payload, "PENDING"));
+        PipelineExecutionLease lease = new PipelineExecutionLease(
+                "execution-1", "worker-1", Instant.parse("2030-01-01T00:01:00Z"), 7);
+
+        new CashOutputPublisherLoader(repository, new LocalFilePublisher())
+                .execute(step("source.csv"), new PipelineExecutionContext(lease));
+
+        assertEquals(1, repository.fencedMarkPublishedCalls);
+        assertEquals(0, repository.markPublishedCalls);
+        assertEquals(0, repository.fencedRecordErrorCalls);
+        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+    }
+
+    @Test
+    void shouldNotMarkDeliveryWhenLeaseIsStale() throws Exception {
+        byte[] payload = "stale-worker".getBytes(StandardCharsets.UTF_8);
+        FakeRepository repository = new FakeRepository(
+                delivery("output.csv", payload, "PENDING"));
+        repository.fencedMarkPublishedResult = false;
+        PipelineExecutionLease lease = new PipelineExecutionLease(
+                "execution-1", "old-worker", Instant.parse("2030-01-01T00:01:00Z"), 6);
+
+        assertThrows(IllegalStateException.class,
+                () -> new CashOutputPublisherLoader(
+                        repository, new LocalFilePublisher())
+                        .execute(step("source.csv"),
+                                new PipelineExecutionContext(lease)));
+
+        assertEquals(1, repository.fencedMarkPublishedCalls);
+        assertEquals(1, repository.fencedRecordErrorCalls);
+        assertEquals(0, repository.markPublishedCalls);
+        assertEquals(0, repository.recordErrorCalls);
+        // Filesystem publication is content-addressed/idempotent for this
+        // immutable delivery; the stale worker cannot change SQL ownership state.
+        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+    }
+
     private CashOutputDelivery delivery(
             String fileName,
             byte[] payload,
@@ -166,6 +210,9 @@ class CashOutputPublisherLoaderTest {
         private final CashOutputDelivery delivery;
         private int markPublishedCalls;
         private int recordErrorCalls;
+        private int fencedMarkPublishedCalls;
+        private int fencedRecordErrorCalls;
+        private boolean fencedMarkPublishedResult = true;
         private boolean failMarkPublished;
 
         private FakeRepository(CashOutputDelivery delivery) {
@@ -191,8 +238,22 @@ class CashOutputPublisherLoaderTest {
         }
 
         @Override
+        public boolean markPublished(
+                String sourceFile, PipelineExecutionLease lease) {
+            fencedMarkPublishedCalls++;
+            return fencedMarkPublishedResult;
+        }
+
+        @Override
         public void recordError(String sourceFile, String message) {
             recordErrorCalls++;
+        }
+
+        @Override
+        public boolean recordError(
+                String sourceFile, String message, PipelineExecutionLease lease) {
+            fencedRecordErrorCalls++;
+            return false;
         }
     }
 }

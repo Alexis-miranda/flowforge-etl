@@ -4,6 +4,7 @@ import com.flowforge.etl.cash.delivery.CashOutputDelivery;
 import com.flowforge.etl.cash.delivery.CashOutputDeliveryRepository;
 import com.flowforge.etl.core.domain.StepType;
 import com.flowforge.etl.core.execution.PipelineExecutor;
+import com.flowforge.etl.core.execution.PipelineExecutionLease;
 import com.flowforge.etl.core.execution.StepExecutor;
 import org.junit.jupiter.api.Test;
 
@@ -60,7 +61,19 @@ class PipelineExecutorFactoryTest {
         }
 
         @Override
+        public boolean markPublished(
+                String sourceFile, PipelineExecutionLease lease) {
+            return false;
+        }
+
+        @Override
         public void recordError(String sourceFile, String message) {
+        }
+
+        @Override
+        public boolean recordError(
+                String sourceFile, String message, PipelineExecutionLease lease) {
+            return false;
         }
     }
 }
