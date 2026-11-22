@@ -63,6 +63,15 @@ class FlowForgeApiServerTest {
             assertEquals("QUEUED", response.get("status").asText());
             assertNotNull(outbox.enqueued);
 
+            HttpResponse<String> recent = client.send(
+                    HttpRequest.newBuilder(base.resolve("/api/executions?limit=10")).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, recent.statusCode());
+            JsonNode recentResponse = mapper.readTree(recent.body());
+            assertEquals(1, recentResponse.size());
+            assertEquals(executionId, recentResponse.get(0).get("executionId").asText());
+            assertEquals("QUEUED", recentResponse.get(0).get("status").asText());
+
             HttpResponse<String> status = client.send(
                     HttpRequest.newBuilder(base.resolve(
                             "/api/executions/" + executionId)).GET().build(),
@@ -81,8 +90,81 @@ class FlowForgeApiServerTest {
         }
     }
 
+    @Test
+    void shouldReturnEmptyHistoryAndUseDefaultLimitWhenNoRequestsExist() throws Exception {
+        RecordingOutbox outbox = new RecordingOutbox();
+        var requestService = new ExecutionRequestService(outbox, Clock.systemUTC());
+        var queryService = new ExecutionQueryService(new EmptyExecutionRepository(), outbox);
+
+        try (FlowForgeApiServer server =
+                     new FlowForgeApiServer("127.0.0.1", 0, requestService, queryService)) {
+            server.start();
+            URI endpoint = URI.create("http://127.0.0.1:" + server.port() + "/api/executions");
+
+            HttpResponse<String> response = HttpClient.newHttpClient().send(
+                    HttpRequest.newBuilder(endpoint).GET().build(),
+                    HttpResponse.BodyHandlers.ofString());
+
+            assertEquals(200, response.statusCode());
+            assertEquals(0, mapper.readTree(response.body()).size());
+            assertEquals(25, outbox.lastRecentLimit);
+        }
+    }
+
+    @Test
+    void shouldRejectInvalidRecentExecutionLimits() throws Exception {
+        RecordingOutbox outbox = new RecordingOutbox();
+        var requestService = new ExecutionRequestService(outbox, Clock.systemUTC());
+        var queryService = new ExecutionQueryService(new EmptyExecutionRepository(), outbox);
+
+        try (FlowForgeApiServer server =
+                     new FlowForgeApiServer("127.0.0.1", 0, requestService, queryService)) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+            URI base = URI.create("http://127.0.0.1:" + server.port());
+
+            for (String invalidLimit : List.of("0", "101", "abc", "")) {
+                HttpResponse<String> response = client.send(
+                        HttpRequest.newBuilder(base.resolve(
+                                "/api/executions?limit=" + invalidLimit)).GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+                assertEquals(400, response.statusCode(), "limit=" + invalidLimit);
+                assertTrue(mapper.readTree(response.body()).has("error"));
+            }
+
+            assertEquals(-1, outbox.lastRecentLimit,
+                    "Invalid limits must be rejected before querying the outbox");
+        }
+    }
+
+    @Test
+    void shouldAcceptMinimumAndMaximumRecentExecutionLimits() throws Exception {
+        RecordingOutbox outbox = new RecordingOutbox();
+        var requestService = new ExecutionRequestService(outbox, Clock.systemUTC());
+        var queryService = new ExecutionQueryService(new EmptyExecutionRepository(), outbox);
+
+        try (FlowForgeApiServer server =
+                     new FlowForgeApiServer("127.0.0.1", 0, requestService, queryService)) {
+            server.start();
+            HttpClient client = HttpClient.newHttpClient();
+            URI base = URI.create("http://127.0.0.1:" + server.port());
+
+            for (int limit : List.of(1, 100)) {
+                HttpResponse<String> response = client.send(
+                        HttpRequest.newBuilder(base.resolve(
+                                "/api/executions?limit=" + limit)).GET().build(),
+                        HttpResponse.BodyHandlers.ofString());
+
+                assertEquals(200, response.statusCode());
+                assertEquals(limit, outbox.lastRecentLimit);
+            }
+        }
+    }
+
     private static final class RecordingOutbox implements PipelineExecutionRequestOutbox {
         private PipelineExecutionRequest enqueued;
+        private int lastRecentLimit = -1;
 
         @Override
         public void enqueue(PipelineExecutionRequest request) {
@@ -102,6 +184,17 @@ class FlowForgeApiServerTest {
         @Override
         public boolean recordPublishFailure(UUID messageId, String errorMessage) {
             return false;
+        }
+
+        @Override
+        public List<PipelineExecutionRequestStatus> findRecentRequests(int limit) {
+            lastRecentLimit = limit;
+            if (enqueued == null) {
+                return List.of();
+            }
+            return List.of(new PipelineExecutionRequestStatus(
+                    enqueued.executionId(), enqueued.pipelineType(), "PENDING",
+                    enqueued.requestedAt(), 0, null));
         }
 
         @Override

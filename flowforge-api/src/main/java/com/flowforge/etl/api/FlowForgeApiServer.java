@@ -56,6 +56,10 @@ public final class FlowForgeApiServer implements AutoCloseable {
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
 
+            if ("/api/executions".equals(path) && "GET".equals(method)) {
+                listRecent(exchange);
+                return;
+            }
             if ("/api/executions".equals(path) && "POST".equals(method)) {
                 submit(exchange);
                 return;
@@ -80,7 +84,7 @@ public final class FlowForgeApiServer implements AutoCloseable {
 
             if ("/api/executions".equals(path)
                     || path.startsWith("/api/executions/")) {
-                exchange.getResponseHeaders().set("Allow", "/api/executions: POST; /api/executions/{id}: GET");
+                exchange.getResponseHeaders().set("Allow", "GET, POST");
                 send(exchange, 405, new ApiError("Method or endpoint not supported"));
             } else {
                 send(exchange, 404, new ApiError("Endpoint not found"));
@@ -94,6 +98,32 @@ public final class FlowForgeApiServer implements AutoCloseable {
         } finally {
             exchange.close();
         }
+    }
+
+    private void listRecent(HttpExchange exchange) throws IOException {
+        int limit = parseLimit(exchange.getRequestURI().getRawQuery());
+        send(exchange, 200, queryService.findRecent(limit));
+    }
+
+    private static int parseLimit(String rawQuery) {
+        if (rawQuery == null || rawQuery.isBlank()) {
+            return 25;
+        }
+        for (String parameter : rawQuery.split("&")) {
+            String[] pair = parameter.split("=", 2);
+            if ("limit".equals(pair[0])) {
+                try {
+                    int limit = Integer.parseInt(pair.length == 2 ? pair[1] : "");
+                    if (limit < 1 || limit > 100) {
+                        throw new IllegalArgumentException("Limit must be between 1 and 100");
+                    }
+                    return limit;
+                } catch (NumberFormatException exception) {
+                    throw new IllegalArgumentException("Limit must be an integer between 1 and 100");
+                }
+            }
+        }
+        return 25;
     }
 
     private void submit(HttpExchange exchange) throws IOException {

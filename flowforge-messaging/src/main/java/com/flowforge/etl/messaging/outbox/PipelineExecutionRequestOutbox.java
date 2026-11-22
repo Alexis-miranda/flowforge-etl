@@ -24,6 +24,17 @@ public interface PipelineExecutionRequestOutbox {
         return Optional.empty();
     }
 
+    /**
+     * Finds the most recently accepted requests, newest first.
+     * Implementations that do not support request history may return an empty list.
+     */
+    default List<PipelineExecutionRequestStatus> findRecentRequests(int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("Limit must be greater than zero");
+        }
+        return List.of();
+    }
+
     /** Atomically stores a request and its pending delivery record. */
     void enqueue(PipelineExecutionRequest request);
 
