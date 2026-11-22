@@ -272,6 +272,52 @@ class InMemoryPipelineExecutionRepositoryTest {
     }
 
     @Test
+    void shouldAllowOnlyOneConcurrentExecutionClaim() throws Exception {
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+        PipelineExecutionSnapshot snapshot =
+                new PipelineExecutionSnapshot(
+                        "execution-concurrent-claim",
+                        "pipeline-claim",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        Instant.parse("2026-01-01T10:00:00Z"),
+                        null);
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        try {
+            Future<Boolean> first = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return repository.tryStart(snapshot);
+            });
+            Future<Boolean> second = executor.submit(() -> {
+                ready.countDown();
+                start.await();
+                return repository.tryStart(snapshot);
+            });
+
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+
+            assertNotEquals(
+                    first.get(5, TimeUnit.SECONDS),
+                    second.get(5, TimeUnit.SECONDS));
+            assertEquals(
+                    1,
+                    repository.findSnapshotsByPipelineId("pipeline-claim")
+                            .size());
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
     void shouldRejectConcurrentDuplicateSaves() throws Exception {
         InMemoryPipelineExecutionRepository repository =
                 new InMemoryPipelineExecutionRepository();
