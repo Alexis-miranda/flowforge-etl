@@ -12,7 +12,6 @@ import com.rabbitmq.client.DeliverCallback;
 import com.rabbitmq.client.Delivery;
 
 import java.io.IOException;
-import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -175,22 +174,24 @@ public final class RabbitMqPipelineExecutionRequestConsumer implements AutoClose
                     .messageId(delivery.getProperties().getMessageId())
                     .correlationId(delivery.getProperties().getCorrelationId())
                     .type(delivery.getProperties().getType())
-                    .timestamp(delivery.getProperties().getTimestamp() == null
-                            ? java.util.Date.from(Instant.now())
-                            : delivery.getProperties().getTimestamp())
+                    .timestamp(delivery.getProperties().getTimestamp())
                     .headers(headers)
                     .build();
 
             channel.basicPublish("", destinationQueue, false, properties, delivery.getBody());
-            channel.waitForConfirmsOrDie(retryPolicy == null
-                    ? 5000 : retryPolicy.confirmTimeoutMillis());
-            channel.basicAck(deliveryTag, false);
+            channel.waitForConfirmsOrDie(retryPolicy.confirmTimeoutMillis());
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             channel.basicNack(deliveryTag, false, true);
+            return;
         } catch (TimeoutException | IOException | RuntimeException publishFailure) {
             channel.basicNack(deliveryTag, false, true);
+            return;
         }
+
+        // Keep acknowledgement outside the publish catch: an ACK failure must
+        // not be followed by a NACK on the same delivery.
+        channel.basicAck(deliveryTag, false);
     }
 
     private static int currentRetryCount(Map<String, Object> headers) {
