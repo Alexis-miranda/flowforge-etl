@@ -48,7 +48,11 @@ BEGIN
             PRIMARY KEY (ExecutionId),
 
         CONSTRAINT CK_ETLExecutionLease_FencingToken
-            CHECK (FencingToken >= 1)
+            CHECK (FencingToken >= 1),
+
+        CONSTRAINT FK_ETLExecutionLease_ETLExecution
+            FOREIGN KEY (ExecutionId)
+            REFERENCES dbo.ETLExecution (ExecutionId)
     );
 END;
 GO
