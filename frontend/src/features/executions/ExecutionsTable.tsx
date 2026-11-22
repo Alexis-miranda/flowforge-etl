@@ -1,4 +1,5 @@
-import { FileClock, Filter, Search } from 'lucide-react';
+import { ArrowUpRight, FileClock, Filter, Search } from 'lucide-react';
+import { Status } from '../../components/Status';
 import type { RunStatus } from '../../components/Status';
 
 export type Run = {
@@ -34,7 +35,7 @@ export function ExecutionsTable({
     <section className="panel runs-panel">
       <div className="panel-head">
         <div><h2>Recent executions</h2><p>Monitor your latest pipeline activity</p></div>
-        <button className="text-button">View all runs <span aria-hidden="true">↗</span></button>
+        <button className="text-button">View all runs <ArrowUpRight size={15} /></button>
       </div>
       <div className="run-toolbar">
         <div className="tabs">
@@ -71,7 +72,7 @@ export function ExecutionsTable({
                 <td>{run.started}</td>
                 <td>{run.duration}</td>
                 <td>{run.rows}</td>
-                <td><span className={`status ${run.status.toLowerCase()}`}><i />{run.status}</span></td>
+                <td><Status status={run.status} /></td>
               </tr>
             ))}
           </tbody>
