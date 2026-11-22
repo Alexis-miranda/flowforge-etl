@@ -75,7 +75,7 @@ public final class PipelineRecoveryCoordinator {
             return new PipelineRecoveryAssessmentResult(
                     executionId,
                     pipeline.id(),
-                    PipelineStatus.RUNNING,
+                    null,
                     RecoveryCoordinationStatus.LEASE_UNAVAILABLE,
                     List.of());
         }
