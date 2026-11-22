@@ -1,5 +1,6 @@
 package com.flowforge.etl.messaging.rabbitmq;
 
+import com.flowforge.etl.messaging.consumer.NonRetryablePipelineExecutionRequestException;
 import com.flowforge.etl.messaging.consumer.PipelineExecutionRequestHandler;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestJsonCodec;
@@ -88,6 +89,9 @@ public final class RabbitMqPipelineExecutionRequestConsumer implements AutoClose
 
         try {
             handler.handle(request);
+        } catch (NonRetryablePipelineExecutionRequestException invalidRequest) {
+            channel.basicReject(deliveryTag, false);
+            return;
         } catch (InterruptedException interrupted) {
             Thread.currentThread().interrupt();
             channel.basicNack(deliveryTag, false, true);
