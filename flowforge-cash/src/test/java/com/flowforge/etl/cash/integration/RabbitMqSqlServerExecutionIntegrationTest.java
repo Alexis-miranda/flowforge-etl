@@ -121,7 +121,14 @@ class RabbitMqSqlServerExecutionIntegrationTest {
                     UUID.randomUUID(), "integration", Map.of("case", "retry-to-dlq"), Instant.now());
             broker.publish(queue, request);
 
-            awaitCondition(() -> broker.messageCount(deadQueue) == 1,
+            awaitCondition(() -> {
+                        try {
+                            return broker.messageCount(deadQueue) == 1;
+                        } catch (Exception exception) {
+                            throw new IllegalStateException(
+                                    "Could not inspect the dead-letter queue", exception);
+                        }
+                    },
                     Duration.ofSeconds(15),
                     "Message did not reach the dead-letter queue after bounded retries");
 
