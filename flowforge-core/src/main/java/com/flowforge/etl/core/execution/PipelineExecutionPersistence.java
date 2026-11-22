@@ -26,8 +26,9 @@ final class PipelineExecutionPersistence {
             return;
         }
 
+        boolean claimed;
         try {
-            repository.start(toSnapshot(
+            claimed = repository.tryStart(toSnapshot(
                     execution.executionId(),
                     execution.pipelineId(),
                     execution.status(),
@@ -43,6 +44,11 @@ final class PipelineExecutionPersistence {
                             PipelineExecutionPersistenceException.Operation.START,
                             exception)),
                     null);
+        }
+
+        if (!claimed) {
+            throw new DuplicatePipelineExecutionException(
+                    execution.executionId());
         }
     }
 
