@@ -3,42 +3,28 @@ package com.flowforge.etl.core.repository;
 import com.flowforge.etl.core.execution.PipelineExecutionLease;
 
 import java.time.Duration;
-import java.time.Instant;
 import java.util.Optional;
 
 /**
  * Coordinates time-bounded ownership of pipeline executions.
  *
- * <p>Implementations must make acquisition, renewal and release atomic with
- * respect to competing workers. Fencing tokens must increase whenever an
- * expired or released lease is acquired again and must never be reset for an
- * execution ID.</p>
+ * <p>Implementations use their own authoritative clock. A distributed
+ * implementation should use the database clock rather than worker clocks.
+ * Fencing tokens must increase whenever a lease is acquired again and must
+ * never be reset for an execution ID.</p>
  */
 public interface PipelineExecutionLeaseRepository {
 
-    /**
-     * Attempts to acquire an unowned or expired execution lease.
-     *
-     * @return the new lease, or empty when another worker currently owns it
-     */
+    /** Attempts to acquire an unowned or expired execution lease. */
     Optional<PipelineExecutionLease> tryAcquire(
-            String executionId,
-            String ownerId,
-            Instant now,
-            Duration leaseDuration);
+            String executionId, String ownerId, Duration leaseDuration);
 
-    /**
-     * Extends a lease only if its owner and fencing token are still current
-     * and the lease has not expired.
-     */
-    boolean renew(
-            PipelineExecutionLease lease,
-            Instant now,
-            Duration leaseDuration);
+    /** Extends a lease only while its owner and fencing token are current. */
+    boolean renew(PipelineExecutionLease lease, Duration leaseDuration);
 
     /**
      * Releases a lease only if its owner and fencing token are still current.
      * The fencing-token history is retained after release.
      */
-    boolean release(PipelineExecutionLease lease, Instant releasedAt);
+    boolean release(PipelineExecutionLease lease);
 }
