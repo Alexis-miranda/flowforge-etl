@@ -38,7 +38,7 @@ class CashOutputPublisherLoaderTest {
 
         loader.execute(step("source.csv"), new PipelineExecutionContext());
 
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
         assertEquals(1, repository.markPublishedCalls);
         assertEquals(0, repository.recordErrorCalls);
     }
@@ -53,7 +53,7 @@ class CashOutputPublisherLoaderTest {
         new CashOutputPublisherLoader(repository, new LocalFilePublisher())
                 .execute(step("source.csv"), new PipelineExecutionContext());
 
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
         assertEquals(1, repository.markPublishedCalls);
     }
 
@@ -101,14 +101,14 @@ class CashOutputPublisherLoaderTest {
         assertThrows(IllegalStateException.class,
                 () -> loader.execute(
                         step("source.csv"), new PipelineExecutionContext()));
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
 
         repository.failMarkPublished = false;
         loader.execute(step("source.csv"), new PipelineExecutionContext());
 
         assertEquals(2, repository.markPublishedCalls);
         assertEquals(1, repository.recordErrorCalls);
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
     }
 
     @Test
@@ -154,7 +154,7 @@ class CashOutputPublisherLoaderTest {
         assertEquals(1, repository.fencedMarkPublishedCalls);
         assertEquals(0, repository.markPublishedCalls);
         assertEquals(0, repository.fencedRecordErrorCalls);
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
     }
 
     @Test
@@ -178,7 +178,16 @@ class CashOutputPublisherLoaderTest {
         assertEquals(0, repository.recordErrorCalls);
         // Filesystem publication is content-addressed/idempotent for this
         // immutable delivery; the stale worker cannot change SQL ownership state.
-        assertArrayEquals(payload, Files.readAllBytes(tempDir.resolve("output.csv")));
+        assertArrayEquals(payload, Files.readAllBytes(findPublishedArtifact()));
+    }
+
+    private Path findPublishedArtifact() throws Exception {
+        try (var paths = Files.walk(tempDir)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> path.getFileName().toString().equals("output.csv"))
+                    .findFirst()
+                    .orElseThrow();
+        }
     }
 
     private CashOutputDelivery delivery(
