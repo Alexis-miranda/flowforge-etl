@@ -24,17 +24,21 @@ public record PipelineRecoveryAssessmentResult(
         if (pipelineId == null || pipelineId.isBlank()) {
             throw new IllegalArgumentException("Pipeline ID must not be blank");
         }
-        if (observedExecutionStatus == null || coordinationStatus == null) {
-            throw new IllegalArgumentException("Recovery result status must not be null");
+        if (coordinationStatus == null) {
+            throw new IllegalArgumentException("Coordination status must not be null");
         }
         if (stepAssessments == null) {
             throw new IllegalArgumentException("Step assessments must not be null");
         }
         stepAssessments = List.copyOf(stepAssessments);
-        if (coordinationStatus == RecoveryCoordinationStatus.LEASE_UNAVAILABLE
-                && !stepAssessments.isEmpty()) {
+        if (coordinationStatus == RecoveryCoordinationStatus.LEASE_UNAVAILABLE) {
+            if (observedExecutionStatus != null || !stepAssessments.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Execution state must not be reported when the lease is unavailable");
+            }
+        } else if (observedExecutionStatus == null) {
             throw new IllegalArgumentException(
-                    "Step assessments must be empty when the lease is unavailable");
+                    "Observed execution status is required after assessment");
         }
     }
 }
