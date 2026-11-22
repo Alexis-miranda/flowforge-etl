@@ -5,8 +5,8 @@ import {
   Plus, Settings2, ShieldCheck, Sparkles, Workflow, X
 } from 'lucide-react';
 import { Metric } from './components/Metric';
-import { Status } from './components/Status';
 import { ExecutionsTable, type Run } from './features/executions/ExecutionsTable';
+import { ExecutionDetails } from './features/executions/ExecutionDetails';
 
 const seedRuns: Run[] = [
   { id:'EX-2048', pipeline:'Cash reconciliation', source:'cash_2026-11-22.csv', started:'Today, 10:42:18', duration:'02m 14s', status:'Succeeded', rows:'24,891' },
@@ -16,7 +16,6 @@ const seedRuns: Run[] = [
   { id:'EX-2044', pipeline:'Cash reconciliation', source:'cash_2026-11-20.csv', started:'Yesterday, 17:12:49', duration:'01m 44s', status:'Succeeded', rows:'19,602' },
   { id:'EX-2043', pipeline:'Cash reconciliation', source:'cash_2026-11-20_b.csv', started:'Yesterday, 16:02:20', duration:'02m 31s', status:'Succeeded', rows:'26,104' },
 ];
-const steps=[{name:'Extract source file',detail:'Read input and detect format',time:'00:12',done:true},{name:'Validate records',detail:'Schema, required fields and amount rules',time:'00:18',done:true},{name:'Prepare cash data',detail:'Normalize values and map fields',time:'00:36',done:true},{name:'Persist to database',detail:'SQL Server transactional write',time:'00:42',done:true},{name:'Publish output',detail:'Write output artifact',time:'00:16',done:true}];
 export default function App(){
   const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
   const [source,setSource]=useState(''); const [backOffice,setBackOffice]=useState('BNYM'); const [output,setOutput]=useState('/data/output'); const [notice,setNotice]=useState('');
@@ -50,7 +49,8 @@ export default function App(){
         <footer>FlowForge ETL <span>•</span> Dashboard prototype <span>•</span> Data shown is illustrative</footer>
       </div>
     </main>
-    {selected&&<aside className="detail-drawer"><button className="close-detail" onClick={()=>setSelected(null)}><X size={16}/></button><div className="eyebrow">EXECUTION DETAIL</div><h2>{selected.id}</h2><Status status={selected.status}/><div className="detail-source"><small>INPUT FILE</small><b>{selected.source}</b></div><div className="detail-title">Pipeline steps</div>{steps.map((s,i)=><div className="detail-step" key={s.name}><div className={'step-check '+(selected.status==='Failed'&&i===2?'fail':'')}>{selected.status==='Failed'&&i===2?'!':'✓'}</div><div><b>{s.name}</b><small>{s.detail}</small></div><span>{selected.status==='Running'&&i===4?'…':s.time}</span></div>)}<div className="detail-info"><ShieldCheck size={15}/> Execution details are sample data until connected to the REST API.</div></aside>}
+    {selected && <ExecutionDetails run={selected} onClose={() => setSelected(null)} />}
+
     {modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>New pipeline run</h2><p>Configure and start a Cash reconciliation run.</p></div><button className="icon-btn" onClick={()=>setModal(false)}><X size={17}/></button></div><label>Pipeline</label><div className="pipeline-select"><Workflow size={16}/> Cash reconciliation <span>Active</span></div><label>Input file path</label><input className="form-input" value={source} onChange={e=>setSource(e.target.value)} placeholder="/shared/input/cash-file.csv"/><label>Back office code</label><input className="form-input" value={backOffice} onChange={e=>setBackOffice(e.target.value)} placeholder="BNYM"/><label>Output directory</label><input className="form-input" value={output} onChange={e=>setOutput(e.target.value)}/><p className="modal-note">Demo only — this form creates a local sample execution. It does not submit to the backend yet.</p>{notice&&<div className="notice">{notice}</div>}<div className="modal-actions"><button className="secondary" onClick={()=>setModal(false)}>Cancel</button><button className="primary" onClick={launch}><Play size={15}/> Start demo run</button></div></div></div>}
   </div>
 }
