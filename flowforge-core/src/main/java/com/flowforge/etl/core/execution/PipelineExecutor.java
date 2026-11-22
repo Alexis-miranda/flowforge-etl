@@ -68,6 +68,7 @@ public class PipelineExecutor {
         for (int index = 0; index < steps.size(); index++) {
             PipelineStep step = steps.get(index);
             Instant stepStartedAt = Instant.now();
+            persistence.persistStepStart(execution.executionId(), step, stepStartedAt);
             StepExecutor stepExecutor;
             try {
                 stepExecutor = executorRegistry.resolve(step);
@@ -78,6 +79,8 @@ public class PipelineExecutor {
             try {
                 stepExecutor.execute(step, context);
                 history.recordSucceeded(step, stepStartedAt);
+                persistence.persistStepFinish(execution.executionId(),
+                        history.records().get(history.records().size() - 1));
             } catch (RuntimeException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
@@ -97,6 +100,10 @@ public class PipelineExecutor {
             StepExecutionHistory history, RuntimeException exception, Instant stepStartedAt) {
         String errorMessage = history.recordFailed(failedStep, exception, stepStartedAt);
         history.recordSkippedAfterFailure(steps, failedIndex, failedStep);
+        List<StepExecutionRecord> records = history.records();
+        for (int index = failedIndex; index < records.size(); index++) {
+            persistence.persistStepFinish(execution.executionId(), records.get(index));
+        }
         execution.fail();
         notifyStatus(pipelineId, execution.status());
         return persistence.persistResult(toResult(execution, failedStep.id(), errorMessage, history));
