@@ -23,6 +23,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
+      rabbitmq:
+        image: rabbitmq:4.1-alpine
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
       sqlserver:
         image: mcr.microsoft.com/mssql/server:2022-latest
         env:
@@ -41,6 +50,7 @@ jobs:
       FLOWFORGE_DB_JDBC_URL: "jdbc:sqlserver://localhost:1433;databaseName=FlowForgeETL_Dev;encrypt=true;trustServerCertificate=true"
       FLOWFORGE_DB_USER: sa
       FLOWFORGE_DB_PASSWORD: "FlowForge_CI_2026!Strong"
+      FLOWFORGE_TEST_RABBITMQ_URI: "amqp://guest:guest@localhost:5672/"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -88,6 +98,7 @@ jobs:
             docs/cash/sql/05-cash-load-control-schema.sql \
             docs/cash/sql/06-cash-output-delivery-schema.sql \
             docs/cash/sql/07-etl-execution-schema.sql \
+            docs/sql/07-etl-execution-lease-independent-schema.sql \
             docs/cash/sql/08-cash-output-artifact-metadata.sql \
             docs/sql/05-pipeline-step-execution-schema.sql \
             docs/sql/06-pipeline-request-outbox-schema.sql; do
