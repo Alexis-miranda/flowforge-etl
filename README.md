@@ -55,7 +55,7 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - Local output delivery tracking, integrity verification, and recovery.
 - Reusable SFTP file reader and writer with SSH host-key verification.
 - Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.
-- A bounded outbox dispatcher, RabbitMQ publisher, manual-ack request consumer, and lease-protected request handler boundary.
+- A bounded outbox dispatcher, RabbitMQ publisher, manual-ack request consumer, and lease-protected request handler with periodic lease renewal and execution-boundary checks.
 - Unit tests, filesystem-based integration tests, and SQL Server integration tests.
 
 ## Architecture
@@ -154,7 +154,7 @@ The recovery entry point is `com.flowforge.etl.cash.cli.CashOutputRecoveryCli`. 
 
 The following capabilities are **not currently implemented or integrated**:
 
-- A continuously running dispatcher/worker application and production-ready end-to-end asynchronous execution. A lease-protected handler now resolves requests through an injected pipeline resolver, acquires an execution lease, preserves the request execution ID, and invokes the pipeline executor. A concrete Cash pipeline resolver, worker lifecycle, lease renewal/cancellation for long-running jobs, and operational retry/dead-letter policies remain to be wired.
+- A continuously running dispatcher/worker application and production-ready end-to-end asynchronous execution. A lease-protected handler now resolves requests through an injected pipeline resolver, acquires and periodically renews an execution lease, preserves the request execution ID, and invokes the pipeline executor. The executor stops between steps when renewal is lost. Long-running step implementations must also check the execution-context guard before irreversible work; fencing-token validation remains required at side-effect boundaries. A concrete Cash pipeline resolver, worker lifecycle, and operational retry/dead-letter policies remain to be wired.
 - Kafka messaging.
 - A REST API or Spring Boot service interface.
 - SFTP publication from the Cash workflow.
@@ -166,7 +166,7 @@ This is a personal development project, not a production-certified system. Befor
 
 - [ ] Confirm the official output-file specification and production mappings.
 - [ ] Add further transformation types where required by real workflows.
-- [ ] Wire a concrete Cash pipeline resolver and worker lifecycle; add lease renewal and safe cancellation for long-running executions.
+- [ ] Wire a concrete Cash pipeline resolver and worker lifecycle; add cooperative cancellation checks inside long-running steps and verify fencing at every side-effect boundary.
 - [ ] Evaluate a REST interface and service deployment.
 - [ ] Integrate SFTP delivery into the Cash workflow.
 

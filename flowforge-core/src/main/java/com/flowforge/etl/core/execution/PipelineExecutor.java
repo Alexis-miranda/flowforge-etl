@@ -58,17 +58,41 @@ public class PipelineExecutor {
 
     private PipelineExecutionResult execute(PipelineDefinition pipeline, PipelineExecution execution,
                                             PipelineExecutionLease lease) {
+        return execute(pipeline, execution, lease, null);
+    }
+
+    /**
+     * Executes under a lease while checking its current ownership between steps.
+     * Long-running step implementations should also call
+     * {@link PipelineExecutionContext#assertLeaseValid()} before irreversible work.
+     */
+    public PipelineExecutionResult executeWithLease(
+            PipelineDefinition pipeline,
+            PipelineExecutionLease lease,
+            PipelineExecutionLeaseGuard leaseGuard) {
+        validatePipeline(pipeline);
+        if (lease == null) throw new IllegalArgumentException("Execution lease must not be null");
+        if (leaseGuard == null) throw new IllegalArgumentException("Lease guard must not be null");
+        PipelineExecution execution = new PipelineExecution(pipeline.id(), lease.executionId());
+        return execute(pipeline, execution, lease, leaseGuard);
+    }
+
+    private PipelineExecutionResult execute(PipelineDefinition pipeline, PipelineExecution execution,
+            PipelineExecutionLease lease, PipelineExecutionLeaseGuard leaseGuard) {
         PipelineExecutionContext context =
-                new PipelineExecutionContext(execution.executionId(), lease);
+                new PipelineExecutionContext(execution.executionId(), lease, leaseGuard);
         StepExecutionHistory history = new StepExecutionHistory();
+        context.assertLeaseValid();
         persistence.persistStart(execution);
         notifyStatus(pipeline.id(), execution.status());
 
         List<PipelineStep> steps = pipeline.steps();
         for (int index = 0; index < steps.size(); index++) {
             PipelineStep step = steps.get(index);
+            context.assertLeaseValid();
             Instant stepStartedAt = Instant.now();
             persistence.persistStepStart(execution.executionId(), step, stepStartedAt);
+            context.assertLeaseValid();
             StepExecutor stepExecutor;
             try {
                 stepExecutor = executorRegistry.resolve(step);
@@ -78,14 +102,18 @@ public class PipelineExecutor {
             }
             try {
                 stepExecutor.execute(step, context);
+            } catch (PipelineExecutionLeaseLostException lostLease) {
+                throw lostLease;
             } catch (RuntimeException exception) {
                 return failExecution(execution, pipeline.id(), step, index,
                         steps, history, exception, stepStartedAt);
             }
+            context.assertLeaseValid();
             history.recordSucceeded(step, stepStartedAt);
             persistence.persistStepFinish(execution.executionId(),
                     history.records().get(history.records().size() - 1));
         }
+        context.assertLeaseValid();
         execution.completeSuccessfully();
         notifyStatus(pipeline.id(), execution.status());
         return persistence.persistResult(toResult(execution, null, null, history));

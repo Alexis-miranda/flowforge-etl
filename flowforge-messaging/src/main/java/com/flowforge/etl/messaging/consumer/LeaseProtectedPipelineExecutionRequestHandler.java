@@ -10,6 +10,7 @@ import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import java.time.Duration;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.ScheduledExecutorService;
 
 /**
  * Executes resolved requests under a SQL-backed execution lease.
@@ -18,10 +19,11 @@ import java.util.Optional;
  * used by each resolved PipelineExecutor. The repository's atomic execution-ID
  * claim is the final duplicate-execution guard.</p>
  *
- * <p>This handler intentionally does not renew leases. The configured lease
- * duration must exceed the maximum expected execution time. Long-running worker
- * deployments need lease renewal and cancellation/fencing integration before
- * using this handler.</p>
+ * <p>The handler periodically renews the lease while the pipeline runs. If a
+ * renewal fails, execution is stopped at the next guard check. Long-running
+ * step implementations should call the context guard before irreversible
+ * side effects; fencing-token validation remains mandatory at persistence and
+ * external side-effect boundaries.</p>
  *
  * <p>An existing execution with the same ID and pipeline is treated as already
  * claimed and is not executed again. Interrupted RUNNING executions are left
@@ -35,13 +37,17 @@ public final class LeaseProtectedPipelineExecutionRequestHandler
     private final PipelineExecutionRepository executionRepository;
     private final String ownerId;
     private final Duration leaseDuration;
+    private final Duration renewalInterval;
+    private final ScheduledExecutorService renewalScheduler;
 
     public LeaseProtectedPipelineExecutionRequestHandler(
             PipelineExecutionRequestPipelineResolver resolver,
             PipelineExecutionLeaseRepository leaseRepository,
             PipelineExecutionRepository executionRepository,
             String ownerId,
-            Duration leaseDuration) {
+            Duration leaseDuration,
+            Duration renewalInterval,
+            ScheduledExecutorService renewalScheduler) {
         this.resolver = Objects.requireNonNull(resolver, "Pipeline resolver must not be null");
         this.leaseRepository = Objects.requireNonNull(leaseRepository, "Lease repository must not be null");
         this.executionRepository = Objects.requireNonNull(executionRepository, "Execution repository must not be null");
@@ -52,7 +58,16 @@ public final class LeaseProtectedPipelineExecutionRequestHandler
             throw new IllegalArgumentException("Lease duration must be positive");
         }
         this.ownerId = ownerId;
+        if (renewalInterval == null || renewalInterval.isZero()
+                || renewalInterval.isNegative()
+                || renewalInterval.compareTo(leaseDuration) >= 0) {
+            throw new IllegalArgumentException(
+                    "Renewal interval must be positive and shorter than the lease duration");
+        }
         this.leaseDuration = leaseDuration;
+        this.renewalInterval = renewalInterval;
+        this.renewalScheduler = Objects.requireNonNull(
+                renewalScheduler, "Lease renewal scheduler must not be null");
     }
 
     @Override
@@ -75,20 +90,26 @@ public final class LeaseProtectedPipelineExecutionRequestHandler
         PipelineExecutionLease lease = acquired.orElseThrow();
         RuntimeException processingFailure = null;
         try {
-            Optional<PipelineExecutionSnapshot> existing =
-                    executionRepository.findSnapshotByExecutionId(executionId);
-            if (existing.isPresent()) {
-                verifyExistingExecution(existing.orElseThrow(), pipelineId, executionId);
-                return;
-            }
+            try (RenewingPipelineExecutionLeaseGuard leaseGuard =
+                         new RenewingPipelineExecutionLeaseGuard(
+                                 leaseRepository, lease, leaseDuration,
+                                 renewalInterval, renewalScheduler)) {
+                Optional<PipelineExecutionSnapshot> existing =
+                        executionRepository.findSnapshotByExecutionId(executionId);
+                if (existing.isPresent()) {
+                    verifyExistingExecution(existing.orElseThrow(), pipelineId, executionId);
+                    return;
+                }
 
-            try {
-                resolved.executor().executeWithLease(resolved.definition(), lease);
-            } catch (DuplicatePipelineExecutionException duplicate) {
-                PipelineExecutionSnapshot snapshot = executionRepository
-                        .findSnapshotByExecutionId(executionId)
-                        .orElseThrow(() -> duplicate);
-                verifyExistingExecution(snapshot, pipelineId, executionId);
+                try {
+                    resolved.executor().executeWithLease(
+                            resolved.definition(), lease, leaseGuard);
+                } catch (DuplicatePipelineExecutionException duplicate) {
+                    PipelineExecutionSnapshot snapshot = executionRepository
+                            .findSnapshotByExecutionId(executionId)
+                            .orElseThrow(() -> duplicate);
+                    verifyExistingExecution(snapshot, pipelineId, executionId);
+                }
             }
         } catch (RuntimeException failure) {
             processingFailure = failure;
