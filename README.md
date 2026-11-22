@@ -161,13 +161,13 @@ Configure the following process environment variables before starting it:
 - `FLOWFORGE_WORKER_PREFETCH` — optional positive prefetch count; defaults to `1`.
 - `FLOWFORGE_WORKER_LEASE_SECONDS` — optional lease duration in seconds; defaults to `90`.
 - `FLOWFORGE_WORKER_LEASE_RENEWAL_SECONDS` — optional renewal interval in seconds; defaults to `20` and must be shorter than the lease.
-- `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` — optional dead-letter exchange configured on the durable queue.
+- `FLOWFORGE_WORKER_MAX_RETRIES` — optional non-negative retry count; defaults to `3` (does not include the initial attempt).\n- `FLOWFORGE_WORKER_RETRY_DELAY_MILLIS` — optional fixed delay before retry; defaults to `30000` ms.\n- `FLOWFORGE_WORKER_RETRY_CONFIRM_TIMEOUT_MILLIS` — optional publisher-confirm timeout; defaults to `5000` ms.\n- `FLOWFORGE_RABBITMQ_RETRY_QUEUE` — optional durable retry queue; defaults to `<main-queue>.retry`.\n- `FLOWFORGE_RABBITMQ_DEAD_LETTER_QUEUE` — optional durable terminal queue; defaults to `<main-queue>.dead`.\n- `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` — optional dead-letter exchange argument for the main queue.
 
 The worker uses RabbitMQ's default exchange: the publisher must send to exchange `""` with the configured queue name as its routing key. The worker does not provision RabbitMQ or SQL Server. The database schema listed above must already be installed.
 
 Each request carries an input-file path, not the file itself. The path must resolve to a readable regular file on the worker host, and the worker must have access to the output directory as well. For multiple worker machines, use a shared filesystem or another explicit file-transfer mechanism; local paths on the producer host are not automatically visible to a remote worker.
 
-The worker cancels its consumer on shutdown, waits for in-flight request handlers, stops lease renewal, and then closes its broker resources. This is an initial application lifecycle, not a production deployment recipe. Retry backoff and dead-letter operations still require an operational queue policy; handler failures are currently requeued by the consumer and may be redelivered repeatedly. Do not treat this worker as production-ready without addressing that policy and validating fencing at every side-effect boundary.
+The worker declares a durable retry queue with a fixed message TTL and dead-letters expired retry messages back to the main queue. On a transient handler failure, it republishes the original message with an incremented retry header, waits for publisher confirmation, and only then acknowledges the original delivery. After the configured retry budget is exhausted, or when a payload is malformed or rejected as non-retryable, it republishes the message to the durable dead-letter queue and acknowledges only after broker confirmation. If republishing fails or times out, the original delivery is negatively acknowledged for broker redelivery. Interrupted handlers are requeued without consuming the retry budget. This is a bounded fixed-delay retry policy, not exponential backoff.\n\nThe worker cancels its consumer on shutdown, waits for in-flight request handlers, stops lease renewal, and then closes its broker resources. This remains an initial application lifecycle, not a production deployment recipe. Dead-letter inspection and replay are operational responsibilities; retrying a dead-lettered execution manually still requires checking its SQL execution state and side effects. Do not treat this worker as production-ready without validating fencing at every side-effect boundary.
 
 ## Project status and boundaries
 
@@ -187,7 +187,7 @@ This is a personal development project, not a production-certified system. Befor
 
 - [ ] Confirm the official output-file specification and production mappings.
 - [ ] Add further transformation types where required by real workflows.
-- [ ] Define and test retry backoff, dead-letter handling, and poison-message operations for the asynchronous worker.
+- [ ] Add operational tooling and runbooks to inspect and safely replay dead-lettered requests.
 - [ ] Add cooperative cancellation checks inside long-running steps and verify fencing at every side-effect boundary.
 - [ ] Add end-to-end tests against disposable RabbitMQ and SQL Server services.
 - [ ] Evaluate a REST interface and service deployment.

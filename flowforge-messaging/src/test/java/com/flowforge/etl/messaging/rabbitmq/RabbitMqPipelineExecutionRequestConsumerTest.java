@@ -168,10 +168,151 @@ class RabbitMqPipelineExecutionRequestConsumerTest {
                         request -> { }, "flowforge.requests", 0));
     }
 
+
+    @Test
+    void shouldPublishFailedRequestToDelayedRetryQueueBeforeAcknowledging() throws Exception {
+        AtomicReference<DeliverCallback> callback = new AtomicReference<>();
+        AtomicReference<Object[]> publishArguments = new AtomicReference<>();
+        List<String> acknowledgements = new ArrayList<>();
+        Channel channel = channelProxy((method, args) -> {
+            if ("basicConsume".equals(method)) {
+                callback.set((DeliverCallback) args[2]);
+                return "consumer-1";
+            }
+            if ("basicPublish".equals(method)) {
+                publishArguments.set(args);
+            }
+            if ("waitForConfirmsOrDie".equals(method)) {
+                acknowledgements.add("confirmed");
+            }
+            if ("basicAck".equals(method)) {
+                acknowledgements.add("ack");
+            }
+            return null;
+        });
+        RabbitMqRetryPolicy policy = new RabbitMqRetryPolicy(
+                "flowforge.requests.retry", "flowforge.requests.dead", 3, 1000, 5000);
+        RabbitMqPipelineExecutionRequestConsumer consumer =
+                new RabbitMqPipelineExecutionRequestConsumer(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        request -> { throw new IllegalStateException("temporary"); },
+                        "flowforge.requests", 1, policy);
+
+        consumer.start();
+        callback.get().handle("consumer-1", delivery(45,
+                new PipelineExecutionRequestJsonCodec().serialize(REQUEST)));
+
+        assertEquals("", publishArguments.get()[0]);
+        assertEquals("flowforge.requests.retry", publishArguments.get()[1]);
+        AMQP.BasicProperties publishedProperties = (AMQP.BasicProperties) publishArguments.get()[3];
+        assertEquals(1, publishedProperties.getHeaders().get("x-flowforge-retry-count"));
+        assertEquals(List.of("confirmed", "ack"), acknowledgements);
+    }
+
+    @Test
+    void shouldDeadLetterWhenRetryBudgetIsExhausted() throws Exception {
+        AtomicReference<DeliverCallback> callback = new AtomicReference<>();
+        AtomicReference<Object[]> publishArguments = new AtomicReference<>();
+        Channel channel = channelProxy((method, args) -> {
+            if ("basicConsume".equals(method)) {
+                callback.set((DeliverCallback) args[2]);
+                return "consumer-1";
+            }
+            if ("basicPublish".equals(method)) {
+                publishArguments.set(args);
+            }
+            return null;
+        });
+        AMQP.BasicProperties properties = new AMQP.BasicProperties.Builder()
+                .headers(Map.of("x-flowforge-retry-count", 3)).build();
+        RabbitMqPipelineExecutionRequestConsumer consumer =
+                new RabbitMqPipelineExecutionRequestConsumer(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        request -> { throw new IllegalStateException("still failing"); },
+                        "flowforge.requests", 1,
+                        new RabbitMqRetryPolicy(
+                                "flowforge.requests.retry", "flowforge.requests.dead", 3, 1000, 5000));
+
+        consumer.start();
+        callback.get().handle("consumer-1", delivery(46,
+                new PipelineExecutionRequestJsonCodec().serialize(REQUEST), properties));
+
+        assertEquals("flowforge.requests.dead", publishArguments.get()[1]);
+    }
+
+    @Test
+    void shouldDeadLetterMalformedPayloadWhenRetryPolicyIsConfigured() throws Exception {
+        AtomicReference<DeliverCallback> callback = new AtomicReference<>();
+        AtomicReference<Object[]> publishArguments = new AtomicReference<>();
+        Channel channel = channelProxy((method, args) -> {
+            if ("basicConsume".equals(method)) {
+                callback.set((DeliverCallback) args[2]);
+                return "consumer-1";
+            }
+            if ("basicPublish".equals(method)) {
+                publishArguments.set(args);
+            }
+            return null;
+        });
+        RabbitMqPipelineExecutionRequestConsumer consumer =
+                new RabbitMqPipelineExecutionRequestConsumer(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        request -> fail("Malformed request must not reach handler"),
+                        "flowforge.requests", 1,
+                        new RabbitMqRetryPolicy(
+                                "flowforge.requests.retry", "flowforge.requests.dead", 2, 1000, 5000));
+
+        consumer.start();
+        callback.get().handle("consumer-1",
+                delivery(47, "{not-json".getBytes(StandardCharsets.UTF_8)));
+
+        assertEquals("flowforge.requests.dead", publishArguments.get()[1]);
+    }
+
+
+    @Test
+    void shouldRequeueOriginalWhenRetryPublishCannotBeConfirmed() throws Exception {
+        AtomicReference<DeliverCallback> callback = new AtomicReference<>();
+        AtomicReference<Object[]> nackArguments = new AtomicReference<>();
+        Channel channel = channelProxy((method, args) -> {
+            if ("basicConsume".equals(method)) {
+                callback.set((DeliverCallback) args[2]);
+                return "consumer-1";
+            }
+            if ("waitForConfirmsOrDie".equals(method)) {
+                throw new java.io.IOException("broker channel failed");
+            }
+            if ("basicNack".equals(method)) {
+                nackArguments.set(args);
+            }
+            return null;
+        });
+        RabbitMqPipelineExecutionRequestConsumer consumer =
+                new RabbitMqPipelineExecutionRequestConsumer(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        request -> { throw new IllegalStateException("temporary"); },
+                        "flowforge.requests", 1,
+                        new RabbitMqRetryPolicy(
+                                "flowforge.requests.retry", "flowforge.requests.dead", 2, 1000, 5000));
+
+        consumer.start();
+        callback.get().handle("consumer-1", delivery(48,
+                new PipelineExecutionRequestJsonCodec().serialize(REQUEST)));
+
+        assertEquals(48L, nackArguments.get()[0]);
+        assertEquals(true, nackArguments.get()[2]);
+    }
+
     private static Delivery delivery(long tag, byte[] body) {
+        return delivery(tag, body,
+                new AMQP.BasicProperties.Builder().contentType("application/json").build());
+    }
+
+    private static Delivery delivery(
+            long tag, byte[] body, AMQP.BasicProperties properties) {
         return new Delivery(
                 new Envelope(tag, false, "flowforge.exchange", "pipeline.execute"),
-                new AMQP.BasicProperties.Builder().contentType("application/json").build(),
+                properties,
                 body);
     }
 

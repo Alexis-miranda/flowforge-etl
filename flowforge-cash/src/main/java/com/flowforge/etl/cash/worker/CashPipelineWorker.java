@@ -10,6 +10,7 @@ import com.flowforge.etl.core.repository.PipelineExecutionRepository;
 import com.flowforge.etl.messaging.consumer.LeaseProtectedPipelineExecutionRequestHandler;
 import com.flowforge.etl.messaging.consumer.PipelineExecutionRequestHandler;
 import com.flowforge.etl.messaging.rabbitmq.RabbitMqPipelineExecutionRequestConsumer;
+import com.flowforge.etl.messaging.rabbitmq.RabbitMqRetryPolicy;
 import com.flowforge.etl.messaging.request.PipelineExecutionRequest;
 import com.flowforge.etl.messaging.serialization.PipelineExecutionRequestJsonCodec;
 import com.rabbitmq.client.Channel;
@@ -67,6 +68,14 @@ public final class CashPipelineWorker implements AutoCloseable {
         String workerId = environmentOrDefault(
                 "FLOWFORGE_WORKER_ID", "cash-worker-" + UUID.randomUUID());
         int prefetch = positiveInt("FLOWFORGE_WORKER_PREFETCH", 1);
+        int maxRetries = nonNegativeInt("FLOWFORGE_WORKER_MAX_RETRIES", 3);
+        long retryDelayMillis = positiveLong("FLOWFORGE_WORKER_RETRY_DELAY_MILLIS", 30_000);
+        long retryConfirmTimeoutMillis = positiveLong(
+                "FLOWFORGE_WORKER_RETRY_CONFIRM_TIMEOUT_MILLIS", 5_000);
+        String retryQueue = environmentOrDefault(
+                "FLOWFORGE_RABBITMQ_RETRY_QUEUE", queue + ".retry");
+        String deadLetterQueue = environmentOrDefault(
+                "FLOWFORGE_RABBITMQ_DEAD_LETTER_QUEUE", queue + ".dead");
         long leaseSeconds = positiveLong("FLOWFORGE_WORKER_LEASE_SECONDS", 90);
         long renewalSeconds = positiveLong("FLOWFORGE_WORKER_LEASE_RENEWAL_SECONDS", 20);
         if (renewalSeconds >= leaseSeconds) {
@@ -83,6 +92,7 @@ public final class CashPipelineWorker implements AutoCloseable {
             connectionFactory.setRequestedHeartbeat(30);
             connection = connectionFactory.newConnection(workerId);
             channel = connection.createChannel();
+            channel.confirmSelect();
 
             Map<String, Object> queueArguments = new HashMap<>();
             String deadLetterExchange = System.getenv(
@@ -91,6 +101,13 @@ public final class CashPipelineWorker implements AutoCloseable {
                 queueArguments.put("x-dead-letter-exchange", deadLetterExchange.trim());
             }
             channel.queueDeclare(queue, true, false, false, queueArguments);
+
+            Map<String, Object> retryQueueArguments = new HashMap<>();
+            retryQueueArguments.put("x-message-ttl", retryDelayMillis);
+            retryQueueArguments.put("x-dead-letter-exchange", "");
+            retryQueueArguments.put("x-dead-letter-routing-key", queue);
+            channel.queueDeclare(retryQueue, true, false, false, retryQueueArguments);
+            channel.queueDeclare(deadLetterQueue, true, false, false, Map.of());
 
             PipelineExecutionRepository executionRepository =
                     new SqlServerPipelineExecutionRepository();
@@ -119,7 +136,13 @@ public final class CashPipelineWorker implements AutoCloseable {
                     new PipelineExecutionRequestJsonCodec(),
                     trackingHandler,
                     queue,
-                    prefetch);
+                    prefetch,
+                    new RabbitMqRetryPolicy(
+                            retryQueue,
+                            deadLetterQueue,
+                            maxRetries,
+                            retryDelayMillis,
+                            retryConfirmTimeoutMillis));
 
             return new CashPipelineWorker(
                     connection, channel, consumer, scheduler, trackingHandler);
@@ -205,6 +228,22 @@ public final class CashPipelineWorker implements AutoCloseable {
             throw new IllegalArgumentException(name + " is too large");
         }
         return (int) value;
+    }
+
+    private static int nonNegativeInt(String name, int defaultValue) {
+        String configured = System.getenv(name);
+        if (configured == null || configured.isBlank()) {
+            return defaultValue;
+        }
+        try {
+            int value = Integer.parseInt(configured.trim());
+            if (value < 0) {
+                throw new IllegalArgumentException(name + " must not be negative");
+            }
+            return value;
+        } catch (NumberFormatException exception) {
+            throw new IllegalArgumentException(name + " must be an integer", exception);
+        }
     }
 
     private static long positiveLong(String name, long defaultValue) {
