@@ -77,6 +77,32 @@ class PipelineExecutorTest {
     }
 
     @Test
+    void shouldNotExecuteStepsWhenExecutionIdWasAlreadyClaimed() {
+        List<String> executedSteps = new ArrayList<>();
+        InMemoryPipelineExecutionRepository repository =
+                new InMemoryPipelineExecutionRepository();
+        PipelineExecutor executor = new PipelineExecutor(
+                List.of(createExecutor(StepType.EXTRACT, executedSteps)),
+                null,
+                repository);
+        PipelineDefinition pipeline = createPipeline(List.of(
+                createStep("extract", StepType.EXTRACT, 1)));
+
+        PipelineExecutionResult first =
+                executor.execute(pipeline, "duplicate-request-id");
+
+        assertEquals(PipelineStatus.SUCCEEDED, first.status());
+        assertEquals(List.of("extract"), executedSteps);
+
+        DuplicatePipelineExecutionException exception = assertThrows(
+                DuplicatePipelineExecutionException.class,
+                () -> executor.execute(pipeline, "duplicate-request-id"));
+
+        assertEquals("duplicate-request-id", exception.executionId());
+        assertEquals(List.of("extract"), executedSteps);
+    }
+
+    @Test
     void shouldRejectBlankSuppliedExecutionId() {
         PipelineExecutor executor = new PipelineExecutor(List.of());
         PipelineDefinition pipeline = createPipeline(List.of());
