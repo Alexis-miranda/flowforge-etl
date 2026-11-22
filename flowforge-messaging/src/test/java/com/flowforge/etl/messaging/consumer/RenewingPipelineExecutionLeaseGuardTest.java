@@ -38,8 +38,24 @@ class RenewingPipelineExecutionLeaseGuardTest {
                              repository, lease, Duration.ofSeconds(2),
                              Duration.ofMillis(10), scheduler)) {
             assertTrue(attempted.await(2, TimeUnit.SECONDS));
-            assertThrows(PipelineExecutionLeaseLostException.class,
-                    guard::assertLeaseValid);
+
+            // The latch is signalled inside the repository stub immediately
+            // before renew() returns. Give the scheduler thread time to record
+            // the rejected result before asserting the guard state.
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+            PipelineExecutionLeaseLostException observed = null;
+            while (System.nanoTime() < deadline && observed == null) {
+                try {
+                    guard.assertLeaseValid();
+                } catch (PipelineExecutionLeaseLostException failure) {
+                    observed = failure;
+                }
+                if (observed == null) {
+                    Thread.sleep(5);
+                }
+            }
+
+            assertNotNull(observed, "Guard should fail closed after rejected renewal");
             assertEquals(1, renewals.get());
         } finally {
             scheduler.shutdownNow();
