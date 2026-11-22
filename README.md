@@ -54,7 +54,7 @@ The workflow also has a recovery CLI that retries pending local output deliverie
 - SQL Server load control to identify duplicate source batches.
 - Local output delivery tracking, integrity verification, and recovery.
 - Reusable SFTP file reader and writer with SSH host-key verification.
-- Unit tests, filesystem-based integration tests, and SQL Server integration tests.
+- Transactional persistence of asynchronous pipeline requests and their pending outbox delivery state in SQL Server.\n- Unit tests, filesystem-based integration tests, and SQL Server integration tests.
 
 ## Architecture
 
@@ -64,7 +64,7 @@ The project is organized as a Maven multi-module application:
 | --- | --- |
 | `flowforge-core` | Pipeline domain model, execution engine, step executor registry, execution context, execution history, and repository abstractions. |
 | `flowforge-connectors` | Reusable CSV, SQL Server, and SFTP infrastructure connectors, including SQL Server execution-history persistence. |
-| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, and CLI entry points. |
+| `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, and CLI entry points. |\n| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher, and transactional outbox port. |
 
 The core module does not depend on the Cash workflow. The Cash module composes the generic engine with the required connectors and business-specific steps.
 
