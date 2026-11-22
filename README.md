@@ -67,7 +67,8 @@ The project is organized as a Maven multi-module application:
 | `flowforge-core` | Pipeline domain model, execution engine, step executor registry, execution context, execution history, and repository abstractions. |
 | `flowforge-connectors` | Reusable CSV, SQL Server, and SFTP infrastructure connectors, including SQL Server execution-history persistence. |
 | `flowforge-cash` | Cash-specific validation, pipeline composition, SQL Server persistence, local output delivery, recovery, CLI entry points, asynchronous request resolution, and the Cash worker entry point. |
-| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, lease-protected request handler, bounded outbox dispatcher, and transactional outbox port. |\n| `flowforge-api` | HTTP endpoints for accepting pipeline requests and querying request, execution, and step status. |
+| `flowforge-messaging` | Transport-neutral execution request contract, JSON serialization, RabbitMQ publisher/consumer adapters, lease-protected request handler, bounded outbox dispatcher, and transactional outbox port. |
+| `flowforge-api` | HTTP endpoints for accepting pipeline requests and querying request, execution, and step status. |
 
 The core module does not depend on the Cash workflow. The Cash module composes the generic engine with the required connectors and business-specific steps.
 
