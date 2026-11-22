@@ -28,6 +28,7 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BooleanSupplier;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -78,17 +79,30 @@ class RabbitMqSqlServerExecutionIntegrationTest {
                         request -> new PipelineExecutionRequestPipeline(definition, executor),
                         leases, executions, "integration-worker-" + suffix,
                         Duration.ofSeconds(30), Duration.ofSeconds(5), scheduler);
-                broker.startConsumer(queue, handler, retryQueue, deadQueue);
+                AtomicReference<Throwable> handlerFailure = new AtomicReference<>();
+                broker.startConsumer(queue, request -> {
+                    try {
+                        handler.handle(request);
+                    } catch (Exception failure) {
+                        handlerFailure.compareAndSet(null, failure);
+                        throw failure;
+                    }
+                }, retryQueue, deadQueue);
                 PipelineExecutionRequest request = new PipelineExecutionRequest(
                         UUID.fromString(executionId), "integration",
                         Map.of("case", "successful-execution"), Instant.now());
                 broker.publish(queue, request);
 
-                awaitCondition(() -> executions.findSnapshotByExecutionId(executionId)
+                awaitCondition(() -> handlerFailure.get() != null
+                                || executions.findSnapshotByExecutionId(executionId)
                                 .map(snapshot -> snapshot.status().name().equals("SUCCEEDED"))
                                 .orElse(false),
                         Duration.ofSeconds(15),
-                        "Pipeline execution did not reach SUCCEEDED in SQL Server");
+                        "Request was not completed or rejected by the handler within 15 seconds");
+                if (handlerFailure.get() != null) {
+                    fail("Pipeline request handler failed before persisting SUCCEEDED",
+                            handlerFailure.get());
+                }
 
                 assertEquals("SUCCEEDED",
                         executions.findSnapshotByExecutionId(executionId).orElseThrow()
