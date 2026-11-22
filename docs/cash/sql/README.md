@@ -18,9 +18,10 @@ Run these scripts against `FlowForgeETL_Dev`, in this order:
 4. `05-cash-load-control-schema.sql`
 5. `06-cash-output-delivery-schema.sql`
 6. `07-etl-execution-schema.sql`
-7. `08-cash-output-artifact-metadata.sql`
-8. `../../sql/05-pipeline-step-execution-schema.sql` (durable step audit)
-9. `../../sql/06-pipeline-request-outbox-schema.sql` (asynchronous execution request outbox)
+7. `../../sql/07-etl-execution-lease-independent-schema.sql` (required for asynchronous worker leases)
+8. `08-cash-output-artifact-metadata.sql`
+9. `../../sql/05-pipeline-step-execution-schema.sql` (durable step audit)
+10. `../../sql/06-pipeline-request-outbox-schema.sql` (asynchronous execution request outbox)
 
 The optional `02-cash-reconciliation-schema.sql` creates reconciliation
 tables, but the first Cash ETL workflow does not use them.
@@ -62,7 +63,11 @@ run from the repository root:
 mvn --batch-mode clean verify
 ```
 
-This enables the SQL Server integration tests. Tests for external SFTP
+This enables the SQL Server integration tests. The RabbitMQ/SQL Server
+asynchronous execution integration tests also require
+`FLOWFORGE_TEST_RABBITMQ_URI`; they are skipped when that variable is absent.
+GitHub Actions starts disposable RabbitMQ and SQL Server service containers and
+runs these tests against both real services. Tests for external SFTP
 infrastructure remain optional and are skipped unless a test SFTP server is
 configured.
 

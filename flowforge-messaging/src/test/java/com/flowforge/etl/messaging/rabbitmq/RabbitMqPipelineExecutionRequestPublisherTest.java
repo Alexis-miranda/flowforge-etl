@@ -75,6 +75,27 @@ class RabbitMqPipelineExecutionRequestPublisherTest {
     }
 
     @Test
+    void shouldAllowTheDefaultExchangeForDirectQueuePublishing() throws Exception {
+        AtomicReference<Object[]> publishedArguments = new AtomicReference<>();
+        Channel channel = channelProxy((method, arguments) -> {
+            if ("basicPublish".equals(method)) {
+                publishedArguments.set(arguments);
+            }
+            return null;
+        });
+        RabbitMqPipelineExecutionRequestPublisher publisher =
+                new RabbitMqPipelineExecutionRequestPublisher(
+                        channel, new PipelineExecutionRequestJsonCodec(),
+                        "", "flowforge.queue", CONFIRM_TIMEOUT_MILLIS);
+
+        publisher.publish(new PipelineExecutionRequest(
+                UUID.randomUUID(), "cash", Map.of(), Instant.now()));
+
+        assertEquals("", publishedArguments.get()[0]);
+        assertEquals("flowforge.queue", publishedArguments.get()[1]);
+    }
+
+    @Test
     void shouldRejectNullRequestBeforePublishing() throws Exception {
         Channel channel = channelProxy((method, arguments) -> null);
         RabbitMqPipelineExecutionRequestPublisher publisher =

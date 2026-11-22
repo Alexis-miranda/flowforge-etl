@@ -50,7 +50,10 @@ public final class RabbitMqPipelineExecutionRequestPublisher
 
         this.channel = Objects.requireNonNull(channel, "Channel must not be null");
         this.codec = Objects.requireNonNull(codec, "Codec must not be null");
-        this.exchange = requireText(exchange, "Exchange must not be blank");
+        if (exchange == null || (!exchange.isEmpty() && exchange.isBlank())) {
+            throw new IllegalArgumentException("Exchange must not be null or whitespace");
+        }
+        this.exchange = exchange;
         this.routingKey = requireText(routingKey, "Routing key must not be blank");
 
         if (confirmTimeoutMillis <= 0) {
