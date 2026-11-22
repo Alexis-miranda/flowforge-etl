@@ -1,3 +1,5 @@
+-- ExecutionId must match dbo.ETLExecution.ExecutionId (NVARCHAR(36)) exactly
+-- so SQL Server can create the foreign key below.
 IF OBJECT_ID(N'dbo.ETLStepExecution', N'U') IS NULL
 BEGIN
     CREATE TABLE dbo.ETLStepExecution
