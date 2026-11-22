@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import {
-  Activity, ArrowDownRight, ArrowUpRight, Bell, ChevronDown, CircleHelp,
+  Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp,
   Clock3, Database, FileClock, Filter, LayoutDashboard, Menu, Play,
   Plus, Search, Settings2, ShieldCheck, Sparkles, Workflow, X
 } from 'lucide-react';
+import { Metric } from './components/Metric';
+import { Status } from './components/Status';
 
 type Run = { id: string; pipeline: string; source: string; started: string; duration: string; status: 'Succeeded'|'Running'|'Failed'; rows: string; };
 const seedRuns: Run[] = [
@@ -15,7 +17,6 @@ const seedRuns: Run[] = [
   { id:'EX-2043', pipeline:'Cash reconciliation', source:'cash_2026-11-20_b.csv', started:'Yesterday, 16:02:20', duration:'02m 31s', status:'Succeeded', rows:'26,104' },
 ];
 const steps=[{name:'Extract source file',detail:'Read input and detect format',time:'00:12',done:true},{name:'Validate records',detail:'Schema, required fields and amount rules',time:'00:18',done:true},{name:'Prepare cash data',detail:'Normalize values and map fields',time:'00:36',done:true},{name:'Persist to database',detail:'SQL Server transactional write',time:'00:42',done:true},{name:'Publish output',detail:'Write output artifact',time:'00:16',done:true}];
-function Status({status}:{status:Run['status']}) { return <span className={'status '+status.toLowerCase()}><i/>{status}</span> }
 export default function App(){
   const [runs,setRuns]=useState(seedRuns); const [filter,setFilter]=useState('All runs'); const [query,setQuery]=useState(''); const [modal,setModal]=useState(false); const [selected,setSelected]=useState<Run | null>(seedRuns[0]);
   const [source,setSource]=useState(''); const [backOffice,setBackOffice]=useState('BNYM'); const [output,setOutput]=useState('/data/output'); const [notice,setNotice]=useState('');
@@ -53,4 +54,3 @@ export default function App(){
     {modal&&<div className="modal-backdrop" onClick={()=>setModal(false)}><div className="modal" onClick={e=>e.stopPropagation()}><div className="modal-head"><div><h2>New pipeline run</h2><p>Configure and start a Cash reconciliation run.</p></div><button className="icon-btn" onClick={()=>setModal(false)}><X size={17}/></button></div><label>Pipeline</label><div className="pipeline-select"><Workflow size={16}/> Cash reconciliation <span>Active</span></div><label>Input file path</label><input className="form-input" value={source} onChange={e=>setSource(e.target.value)} placeholder="/shared/input/cash-file.csv"/><label>Back office code</label><input className="form-input" value={backOffice} onChange={e=>setBackOffice(e.target.value)} placeholder="BNYM"/><label>Output directory</label><input className="form-input" value={output} onChange={e=>setOutput(e.target.value)}/><p className="modal-note">Demo only — this form creates a local sample execution. It does not submit to the backend yet.</p>{notice&&<div className="notice">{notice}</div>}<div className="modal-actions"><button className="secondary" onClick={()=>setModal(false)}>Cancel</button><button className="primary" onClick={launch}><Play size={15}/> Start demo run</button></div></div></div>}
   </div>
 }
-function Metric({label,value,change,up,icon,caption}:{label:string;value:string;change:string;up:boolean;icon:React.ReactNode;caption:string}){return <div className="metric"><div className="metric-top"><span>{label}</span><div className="metric-icon">{icon}</div></div><div className="metric-value">{value}</div><div className="metric-bottom"><span className={'change '+(up?'up':'down')}>{up?<ArrowUpRight size={13}/>:<ArrowDownRight size={13}/>} {change}</span><span>{caption}</span></div></div>}
