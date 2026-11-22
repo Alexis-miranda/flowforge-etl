@@ -3,6 +3,8 @@ package com.flowforge.etl.core.repository;
 
 import com.flowforge.etl.core.execution.PipelineExecutionResult;
 import com.flowforge.etl.core.execution.PipelineExecutionSnapshot;
+import com.flowforge.etl.core.execution.StepExecutionRecord;
+import java.time.Instant;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,6 +37,24 @@ public interface PipelineExecutionRepository {
     default boolean tryStart(PipelineExecutionSnapshot snapshot) {
         start(snapshot);
         return true;
+    }
+
+
+    /**
+     * Persists the start of a step before its executor is invoked.
+     * Implementations should create a RUNNING row keyed by execution and step.
+     */
+    default void startStep(String executionId, String stepId, String stepName,
+                           Instant startedAt) {
+        // Optional for repositories that do not provide durable step history.
+    }
+
+    /**
+     * Persists a terminal step record. A SKIPPED record has no start event;
+     * SUCCEEDED and FAILED records complete a previously started step.
+     */
+    default void finishStep(String executionId, StepExecutionRecord record) {
+        // Optional for repositories that do not provide durable step history.
     }
 
     /**
