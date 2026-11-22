@@ -252,6 +252,26 @@ class InMemoryPipelineExecutionRepositoryTest {
 
 
     @Test
+    void shouldReturnFalseWhenExecutionIdWasAlreadyClaimed() {
+        Instant startedAt = Instant.parse("2026-01-01T10:00:00Z");
+        PipelineExecutionSnapshot snapshot =
+                new PipelineExecutionSnapshot(
+                        "execution-claim",
+                        "pipeline-claim",
+                        PipelineStatus.RUNNING,
+                        null,
+                        null,
+                        startedAt,
+                        null);
+
+        assertTrue(repository.tryStart(snapshot));
+        assertFalse(repository.tryStart(snapshot));
+        assertEquals(
+                Optional.of(snapshot),
+                repository.findSnapshotByExecutionId("execution-claim"));
+    }
+
+    @Test
     void shouldRejectConcurrentDuplicateSaves() throws Exception {
         InMemoryPipelineExecutionRepository repository =
                 new InMemoryPipelineExecutionRepository();
