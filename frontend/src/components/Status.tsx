@@ -1,4 +1,4 @@
-type RunStatus = 'Succeeded' | 'Running' | 'Failed';
+import type { RunStatus } from '../features/executions/types';
 
 type StatusProps = {
   status: RunStatus;
@@ -13,4 +13,3 @@ export function Status({ status }: StatusProps) {
   );
 }
 
-export type { RunStatus };
