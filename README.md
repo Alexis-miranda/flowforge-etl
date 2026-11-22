@@ -212,6 +212,28 @@ It returns `202 Accepted` with an `executionId` and `QUEUED` status. The require
 
 This is an initial development API, not a public production endpoint: it has no authentication, authorization, TLS termination, rate limiting, or CORS policy. It binds to loopback by default. Do not expose it to an untrusted network without adding those controls. The outbox dispatcher is a single-process polling loop; multiple API instances require an atomic outbox-claim/lease mechanism to avoid concurrent duplicate publication. A request that reaches the broker but is later dead-lettered before the worker creates an execution snapshot may continue to appear as `DISPATCHED`; durable consumer/DLQ outcome tracking is a separate future capability.
 
+
+## Dashboard prototype
+
+A responsive React + TypeScript dashboard prototype is available under `frontend/`.
+
+Run it locally:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+This first UI slice includes overview metrics, illustrative execution history with filters/search, pipeline health cards, an execution-detail drawer, and a Cash run form. All dashboard data is currently mocked in the frontend; the run form adds a local demo row only and does not call the REST API yet. Backend integration will follow after the API is hardened for browser access (CORS and authentication).
+
+Build verification:
+
+```bash
+cd frontend
+npm run build
+```
+
 ## Project status and boundaries
 
 **Current milestone: functional Cash ETL workflow.** The generic pipeline engine, CSV processing, Cash validation, SQL Server persistence, audit history, execution history, local output publication, delivery tracking, and recovery are implemented and covered by automated tests.
