@@ -10,6 +10,7 @@ public class PipelineExecutionContext {
     private final Map<String, Object> data = new HashMap<>();
     private final String executionId;
     private final PipelineExecutionLease executionLease;
+    private final PipelineExecutionLeaseGuard leaseGuard;
 
     /** Creates an execution context without identity metadata. */
     public PipelineExecutionContext() { this(null, null); }
@@ -25,6 +26,19 @@ public class PipelineExecutionContext {
      * @param executionLease lease snapshot, or null for local execution
      */
     public PipelineExecutionContext(String executionId, PipelineExecutionLease executionLease) {
+        this(executionId, executionLease, null);
+    }
+
+    /**
+     * Creates an execution context with optional distributed lease monitoring.
+     * @param executionId stable identifier for this execution, or null
+     * @param executionLease lease snapshot, or null for local execution
+     * @param leaseGuard guard that checks current lease ownership, or null
+     */
+    public PipelineExecutionContext(
+            String executionId,
+            PipelineExecutionLease executionLease,
+            PipelineExecutionLeaseGuard leaseGuard) {
         if (executionId != null && executionId.isBlank()) {
             throw new IllegalArgumentException("Execution id must not be blank");
         }
@@ -32,7 +46,11 @@ public class PipelineExecutionContext {
             throw new IllegalArgumentException("Execution id must match the supplied lease");
         }
         this.executionId = executionId;
+        if (leaseGuard != null && executionLease == null) {
+            throw new IllegalArgumentException("Lease guard requires an execution lease");
+        }
         this.executionLease = executionLease;
+        this.leaseGuard = leaseGuard;
     }
 
     /** Returns the stable execution identifier, if available. */
@@ -44,6 +62,16 @@ public class PipelineExecutionContext {
      */
     public Optional<PipelineExecutionLease> executionLease() {
         return Optional.ofNullable(executionLease);
+    }
+
+    /**
+     * Fails when the worker's lease renewal has failed. Step implementations
+     * with long-running work should call this before irreversible side effects.
+     */
+    public void assertLeaseValid() {
+        if (leaseGuard != null) {
+            leaseGuard.assertLeaseValid();
+        }
     }
 
     public void put(String key, Object value) {
