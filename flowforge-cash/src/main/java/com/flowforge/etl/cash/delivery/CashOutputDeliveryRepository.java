@@ -13,11 +13,8 @@ public interface CashOutputDeliveryRepository {
      * Stores the immutable artifact reference for a local execution.
      * Implementations should atomically update only a PENDING delivery.
      */
-    default boolean markPublished(String sourceFile, String executionId,
-                                  String publishedPath, String publishedSha256) {
-        markPublished(sourceFile);
-        return true;
-    }
+    boolean markPublished(String sourceFile, String executionId,
+                          String publishedPath, String publishedSha256);
 
     /** Marks a delivery as published only while the supplied lease remains current. */
     boolean markPublished(String sourceFile, PipelineExecutionLease lease);
@@ -26,10 +23,8 @@ public interface CashOutputDeliveryRepository {
      * Stores the artifact reference only while the supplied lease remains current.
      * Implementations must evaluate the lease predicate in the same update.
      */
-    default boolean markPublished(String sourceFile, PipelineExecutionLease lease,
-                                  String publishedPath, String publishedSha256) {
-        return markPublished(sourceFile, lease);
-    }
+    boolean markPublished(String sourceFile, PipelineExecutionLease lease,
+                          String publishedPath, String publishedSha256);
 
     void recordError(String sourceFile, String message);
     boolean recordError(String sourceFile, String message, PipelineExecutionLease lease);
