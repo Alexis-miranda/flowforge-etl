@@ -39,7 +39,7 @@ class SqlServerPipelineExecutionLeaseRepositoryIntegrationTest {
                 executionId, "worker-2", now, duration).isEmpty());
 
         assertTrue(repository.renew(first, now.plusSeconds(5), duration));
-        assertFalse(repository.renew(first, now.plusSeconds(31), duration));
+        assertFalse(repository.renew(first, now.plusSeconds(36), duration));
 
         assertTrue(repository.release(first, now.plusSeconds(6)));
         assertFalse(repository.release(first, now.plusSeconds(7)));
