@@ -62,7 +62,7 @@ public final class FlowForgeApiServer implements AutoCloseable {
     private void handle(HttpExchange exchange) throws IOException {
         try {
             String origin = exchange.getRequestHeaders().getFirst("Origin");
-            if (java.util.List.of("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173").contains(origin)) {
+            if (origin != null && java.util.Set.of("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173").contains(origin)) {
                 exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
             }
             exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
