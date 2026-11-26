@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp, Clock3, Database,
+  Activity, Bell, ChevronDown, CircleHelp, Database,
   FileClock, LayoutDashboard, Moon, Plus, Settings2, ShieldCheck, Sparkles,
   Sun, Workflow
 } from 'lucide-react';
@@ -32,7 +32,7 @@ export default function Dashboard() {
     try {
       const response = await fetch(`${API_BASE}/api/executions?limit=50`);
       if (!response.ok) throw new Error(`API responded ${response.status}`);
-      const payload = await response.json() as Array<{ executionId: string; pipelineId: string; status: string; requestedAt?: string | null; startedAt?: string | null }>;
+      const payload = await response.json() as Array<{ executionId: string; pipelineId: string; status: string; requestedAt?: string | null; startedAt?: string | null; errorMessage?: string | null }>;
       const actualRuns: Run[] = payload.map(item => ({
         id: item.executionId,
         pipeline: item.pipelineId || 'Cash',
@@ -40,7 +40,8 @@ export default function Dashboard() {
         started: new Date(item.startedAt || item.requestedAt || Date.now()).toLocaleString(),
         duration: '—',
         status: ['SUCCEEDED', 'SUCCESS', 'COMPLETED'].includes(item.status.toUpperCase()) ? 'Succeeded' : item.status.toUpperCase() === 'FAILED' ? 'Failed' : 'Running',
-        rows: '—'
+        rows: '—',
+        errorMessage: item.errorMessage
       }));
       setRuns(actualRuns);
       setSelected(current => current ? actualRuns.find(run => run.id === current.id) ?? null : null);
