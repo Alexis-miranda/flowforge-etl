@@ -48,6 +48,7 @@ public final class FlowForgeApiServer implements AutoCloseable {
         });
         this.server.setExecutor(httpExecutor);
         this.server.createContext("/api/executions", this::handle);
+        this.server.createContext("/api/uploads", this::handle);
     }
 
     public void start() {
@@ -60,7 +61,10 @@ public final class FlowForgeApiServer implements AutoCloseable {
 
     private void handle(HttpExchange exchange) throws IOException {
         try {
-            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "http://localhost:5173");
+            String origin = exchange.getRequestHeaders().getFirst("Origin");
+            if (java.util.List.of("http://localhost:5173", "http://127.0.0.1:5173", "http://localhost:4173", "http://127.0.0.1:4173").contains(origin)) {
+                exchange.getResponseHeaders().set("Access-Control-Allow-Origin", origin);
+            }
             exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
             exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, X-File-Name");
             exchange.getResponseHeaders().set("Vary", "Origin");
