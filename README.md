@@ -61,13 +61,13 @@ For database configuration, schema setup, CLI, worker, and API startup instructi
 
 ## Dashboard status
 
-The React dashboard is a prototype. Its metrics, charts, execution rows, and details use illustrative frontend data. The Cash form adds a local demo row only; it does not call the REST API yet.
+The dashboard now reads recent execution records from the REST API and can upload a CSV to enqueue a Cash execution. The upload flow is intended for local development: API and worker must share the uploaded file path. Metrics and historical charts are not part of this first live-data slice.
 
 ## API
 
-The development API supports submitting Cash executions and querying recent executions, execution status, and step history. See the [API reference](docs/api-reference.md).
+The development API supports CSV uploads for Cash executions, querying recent executions, execution status, and step history. See the [API reference](docs/api-reference.md).
 
-**Security boundary:** the API has no authentication, authorization, TLS termination, rate limiting, or CORS policy and binds to loopback by default. Do not expose it to an untrusted network. Requests carry a filesystem path, not an uploaded file.
+**Security boundary:** the development API has no authentication, authorization, TLS termination, or rate limiting and binds to loopback by default. Its local-development CORS allowlist is not a production security boundary. The CSV upload endpoint stores files on the API host; keep the API private and do not use it with sensitive data until authentication, retention, and shared-storage controls are implemented.
 
 ## Project status
 
