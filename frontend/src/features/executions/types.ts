@@ -10,4 +10,5 @@ export type Run = {
   duration: string;
   status: RunStatus;
   rows: string;
+  errorMessage?: string | null;
 };
