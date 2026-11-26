@@ -94,9 +94,21 @@ API entry point: `com.flowforge.etl.api.FlowForgeApiApplication`.
 
 Both require the SQL Server environment variables and `FLOWFORGE_RABBITMQ_URI`. The API uses a scheduled outbox dispatcher to publish requests to RabbitMQ; the worker consumes those requests and runs the Cash pipeline.
 
-Each request carries an input-file path, not the file itself. The path must be readable by the worker host, and the worker must have access to the output directory. For separate hosts, use a shared filesystem or an explicit file-transfer mechanism. A producer's local path is not automatically available to a remote worker.
+The API's JSON execution endpoint carries an input-file path. The dashboard upload endpoint first writes the CSV to disk, then enqueues that path. The path must be readable by the worker, and the worker must have access to the output directory. For separate hosts, use a shared filesystem or an explicit file-transfer mechanism. A producer's local path is not automatically available to a remote worker.
 
 See [the API reference](../api-reference.md) for endpoints and request format.
+
+## Local dashboard CSV upload
+
+The dashboard uses `http://127.0.0.1:8080` by default; set `VITE_API_BASE_URL` before starting Vite to override it. The API accepts a raw CSV body at `POST /api/uploads`, with the URL-encoded original filename in the `X-File-Name` header.
+
+For a local API and worker on the same Mac, configure the same working directory and these optional paths in both processes:
+
+- `FLOWFORGE_UPLOAD_DIR` (default `data/uploads`)
+- `FLOWFORGE_OUTPUT_DIR` (default `data/output`)
+- `FLOWFORGE_BACK_OFFICE_CODE` (default `BNYM`)
+
+The API writes the uploaded CSV to the upload directory and enqueues its absolute path. The worker must see that exact path. This local upload endpoint is unauthenticated and must remain bound to loopback; do not expose it to a network or upload sensitive production data.
 
 ## Worker configuration
 
