@@ -19,6 +19,7 @@ export function NewExecutionModal({ open, notice, onClose, onCreate }: NewExecut
     setValidationMessage('');
     setBusy(true);
     try { await onCreate({ file }); setFile(null); }
+    catch (error) { setValidationMessage(error instanceof Error ? error.message : 'Error al subir el archivo.'); }
     finally { setBusy(false); }
   };
   return <div className="modal-backdrop" onClick={busy ? undefined : onClose}>
