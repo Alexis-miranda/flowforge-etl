@@ -1,32 +1,26 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Activity, ArrowUpRight, Bell, ChevronDown, CircleHelp, Clock3, Database,
   FileClock, LayoutDashboard, Moon, Plus, Settings2, ShieldCheck, Sparkles,
   Sun, Workflow
 } from 'lucide-react';
-import { Metric } from '../components/Metric';
 import { ExecutionsTable } from '../features/executions/ExecutionsTable';
 import type { ExecutionFilter, Run } from '../features/executions/types';
 import { ExecutionDetails } from '../features/executions/ExecutionDetails';
 import { NewExecutionModal, type NewExecutionInput } from '../features/executions/NewExecutionModal';
 import { useApp } from '../app/AppProvider';
 
-const seedRuns: Run[] = [
-  { id:'EX-2048', pipeline:'Cash reconciliation', source:'cash_2026-11-22.csv', started:'10:42:18', duration:'02m 14s', status:'Succeeded', rows:'24,891' },
-  { id:'EX-2047', pipeline:'Cash reconciliation', source:'cash_2026-11-22_b.csv', started:'10:38:05', duration:'01m 52s', status:'Running', rows:'18,340' },
-  { id:'EX-2046', pipeline:'Cash reconciliation', source:'cash_2026-11-21.csv', started:'09:56:32', duration:'03m 08s', status:'Failed', rows:'—' },
-  { id:'EX-2045', pipeline:'Cash reconciliation', source:'cash_2026-11-21_a.csv', started:'09:24:11', duration:'02m 03s', status:'Succeeded', rows:'22,016' },
-  { id:'EX-2044', pipeline:'Cash reconciliation', source:'cash_2026-11-20.csv', started:'17:12:49', duration:'01m 44s', status:'Succeeded', rows:'19,602' },
-  { id:'EX-2043', pipeline:'Cash reconciliation', source:'cash_2026-11-20_b.csv', started:'16:02:20', duration:'02m 31s', status:'Succeeded', rows:'26,104' },
-];
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://127.0.0.1:8080';
+
 
 export default function Dashboard() {
   const { t, language, setLanguage, theme, setTheme } = useApp();
-  const [runs, setRuns] = useState(seedRuns);
+  const [runs, setRuns] = useState<Run[]>([]);
+  const [apiState, setApiState] = useState<'loading' | 'connected' | 'error'>('loading');
   const [filter, setFilter] = useState<ExecutionFilter>('All runs');
   const [query, setQuery] = useState('');
   const [modal, setModal] = useState(false);
-  const [selected, setSelected] = useState<Run | null>(seedRuns[0]);
+  const [selected, setSelected] = useState<Run | null>(null);
   const [notice, setNotice] = useState('');
 
   const filtered = useMemo(() => runs.filter(r =>
@@ -34,16 +28,45 @@ export default function Dashboard() {
     [r.id, r.source, r.pipeline].join(' ').toLowerCase().includes(query.toLowerCase())
   ), [runs, filter, query]);
 
-  const launch = ({ source }: NewExecutionInput) => {
-    const run: Run = {
-      id: 'EX-' + (2050 + runs.length), pipeline: 'Cash reconciliation',
-      source: source.split('/').pop() || source, started: t('justNow'),
-      duration: '—', status: 'Running', rows: '—'
-    };
-    setRuns([run, ...runs]);
-    setSelected(run);
+  const refreshExecutions = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/executions?limit=50`);
+      if (!response.ok) throw new Error(`API responded ${response.status}`);
+      const payload = await response.json() as Array<{ executionId: string; pipelineId: string; status: string; requestedAt?: string | null; startedAt?: string | null }>;
+      const actualRuns: Run[] = payload.map(item => ({
+        id: item.executionId,
+        pipeline: item.pipelineId || 'Cash',
+        source: 'Cash CSV',
+        started: new Date(item.startedAt || item.requestedAt || Date.now()).toLocaleString(),
+        duration: '—',
+        status: ['SUCCEEDED', 'SUCCESS', 'COMPLETED'].includes(item.status.toUpperCase()) ? 'Succeeded' : item.status.toUpperCase() === 'FAILED' ? 'Failed' : 'Running',
+        rows: '—'
+      }));
+      setRuns(actualRuns);
+      setSelected(current => current ? actualRuns.find(run => run.id === current.id) ?? null : null);
+      setApiState('connected');
+    } catch {
+      setApiState('error');
+    }
+  };
+
+  useEffect(() => {
+    void refreshExecutions();
+    const timer = window.setInterval(() => void refreshExecutions(), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const launch = async ({ file }: NewExecutionInput) => {
+    const response = await fetch(`${API_BASE}/api/uploads`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/csv', 'X-File-Name': encodeURIComponent(file.name) },
+      body: file
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(payload.error || 'No se pudo subir el CSV.');
     setModal(false);
-    setNotice(t('demoCreated'));
+    setNotice(`CSV recibido. Ejecución ${payload.executionId} encolada.`);
+    await refreshExecutions();
   };
 
   const toggleTheme = () => setTheme(theme === 'dark' ? 'light' : 'dark');
@@ -62,7 +85,7 @@ export default function Dashboard() {
       <div className="nav-label second">{t('manage')}</div>
       <nav><a><FileClock size={17}/>{t('schedules')}</a><a><Settings2 size={17}/>{t('settings')}</a></nav>
       <div className="sidebar-bottom">
-        <div className="connection"><span className="online-dot"/><div><b>{t('localDemo')}</b><small>{t('apiNotConnected')}</small></div><ShieldCheck size={15}/></div>
+        <div className="connection"><span className="online-dot"/><div><b>FlowForge API</b><small>{apiState === 'connected' ? 'Conectada' : apiState === 'loading' ? 'Conectando…' : 'Sin conexión'}</small></div><ShieldCheck size={15}/></div>
         <div className="profile"><div className="avatar">AM</div><div><b>Alex Miranda</b><small>{t('backendDeveloper')}</small></div><ChevronDown size={15}/></div>
       </div>
     </aside>
@@ -88,28 +111,11 @@ export default function Dashboard() {
           <div><div className="eyebrow"><Sparkles size={13}/> {t('operationsOverview')}</div><h1>{t('greeting')}, Alex<span>.</span></h1><p>{t('dashboardIntro')}</p></div>
           <button className="primary" onClick={()=>{setModal(true);setNotice('')}}><Plus size={16}/> {t('newPipelineRun')}</button>
         </div>
-        <div className="metric-grid">
-          <Metric label={t('totalExecutions')} value="1,284" change="+12.8%" up icon={<Activity size={17}/>} caption={t('previous7Days')}/>
-          <Metric label={t('successRate')} value="98.4%" change="+2.4%" up icon={<ShieldCheck size={17}/>} caption={t('previous7Days')}/>
-          <Metric label={t('avgDuration')} value="2m 18s" change="-8.2%" up icon={<Clock3 size={17}/>} caption={t('previous7Days')}/>
-          <Metric label={t('recordsProcessed')} value="2.48M" change="+18.6%" up icon={<Database size={17}/>} caption={t('previous7Days')}/>
-        </div>
-        <div className="content-grid">
-          <section className="panel chart-panel">
-            <div className="panel-head"><div><h2>{t('executionActivity')}</h2><p>{t('runsLast7Days')}</p></div><button className="select">{t('last7Days')} <ChevronDown size={14}/></button></div>
-            <div className="chart"><div className="chart-y"><span>40</span><span>30</span><span>20</span><span>10</span><span>0</span></div><div className="chart-body"><div className="grid-lines"><i/><i/><i/><i/><i/></div><div className="bars">{[28,36,22,44,32,48,39].map((h,i)=><div className="bar-pair" key={i}><div className="bar success-bar" style={{height:(h*1.5)+'%'}}/><div className="bar fail-bar" style={{height:(i===2?10:4)+'%'}}/></div>)}</div><div className="days"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div></div></div>
-            <div className="chart-legend"><span><i className="legend-success"/>{t('successful')}</span><span><i className="legend-fail"/>{t('failed')}</span></div>
-          </section>
-          <section className="panel pipeline-panel">
-            <div className="panel-head"><div><h2>{t('pipelineHealth')}</h2><p>{t('currentPipelineStatus')}</p></div><button className="icon-btn" aria-label="Open pipeline health"><ArrowUpRight size={16}/></button></div>
-            <div className="health-card"><div className="health-ring"><strong>98.4<small>%</small></strong></div><div><b>{t('allSystemsOperational')}</b><span>{t('activePipelines')}</span></div></div>
-            <div className="pipeline-row"><span className="pipeline-icon"><Workflow size={16}/></span><div><b>{t('cashReconciliation')}</b><small>{t('dailyLast12')}</small></div><span className="health-pill">{t('healthy')}</span></div>
-            <div className="pipeline-row"><span className="pipeline-icon blue"><Database size={16}/></span><div><b>{t('referenceSync')}</b><small>{t('hourlyLast38')}</small></div><span className="health-pill">{t('healthy')}</span></div>
-            <div className="pipeline-row"><span className="pipeline-icon violet"><Activity size={16}/></span><div><b>{t('archiveProcessor')}</b><small>{t('weeklyLast2')}</small></div><span className="health-pill">{t('healthy')}</span></div>
-          </section>
+        <div className="panel" style={{padding:'14px 18px',marginBottom:14}}>
+          <div className="panel-head"><div><h2>Conexión con API</h2><p>{apiState === 'connected' ? 'Ejecuciones reales consultadas desde el backend.' : apiState === 'loading' ? 'Conectando con FlowForge API…' : 'No se pudo conectar. Comprueba que la API Java esté arrancada.'}</p></div><span className="health-pill">{apiState === 'connected' ? 'Conectada' : apiState === 'loading' ? 'Conectando' : 'Sin conexión'}</span></div>
         </div>
         <ExecutionsTable runs={filtered} filter={filter} query={query} selectedRunId={selected?.id ?? null} onFilterChange={setFilter} onQueryChange={setQuery} onSelectRun={setSelected}/>
-        <footer>FlowForge ETL <span>•</span> {t('dashboardPrototype')} <span>•</span> {t('illustrativeData')}</footer>
+        <footer>FlowForge ETL <span>•</span> Datos de ejecuciones obtenidos de la API</footer>
       </div>
     </main>
     {selected && <ExecutionDetails run={selected} onClose={() => setSelected(null)}/>}
