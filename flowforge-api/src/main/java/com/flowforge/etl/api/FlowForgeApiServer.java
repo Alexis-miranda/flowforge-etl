@@ -8,7 +8,10 @@ import com.sun.net.httpserver.HttpServer;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
@@ -18,6 +21,10 @@ import java.util.concurrent.Executors;
 public final class FlowForgeApiServer implements AutoCloseable {
 
     private static final int MAX_REQUEST_BYTES = 1_048_576;
+    private static final int MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+    private final Path uploadDirectory = Path.of(System.getenv().getOrDefault("FLOWFORGE_UPLOAD_DIR", "data/uploads")).toAbsolutePath().normalize();
+    private final Path outputDirectory = Path.of(System.getenv().getOrDefault("FLOWFORGE_OUTPUT_DIR", "data/output")).toAbsolutePath().normalize();
+    private final String backOfficeCode = System.getenv().getOrDefault("FLOWFORGE_BACK_OFFICE_CODE", "BNYM");
 
     private final HttpServer server;
     private final ExecutorService httpExecutor;
@@ -53,9 +60,21 @@ public final class FlowForgeApiServer implements AutoCloseable {
 
     private void handle(HttpExchange exchange) throws IOException {
         try {
+            exchange.getResponseHeaders().set("Access-Control-Allow-Origin", "http://localhost:5173");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+            exchange.getResponseHeaders().set("Access-Control-Allow-Headers", "Content-Type, X-File-Name");
+            exchange.getResponseHeaders().set("Vary", "Origin");
             String path = exchange.getRequestURI().getPath();
             String method = exchange.getRequestMethod();
 
+            if ("OPTIONS".equals(method)) {
+                exchange.sendResponseHeaders(204, -1);
+                return;
+            }
+            if ("/api/uploads".equals(path) && "POST".equals(method)) {
+                uploadCsv(exchange);
+                return;
+            }
             if ("/api/executions".equals(path) && "GET".equals(method)) {
                 listRecent(exchange);
                 return;
@@ -124,6 +143,52 @@ public final class FlowForgeApiServer implements AutoCloseable {
             }
         }
         return 25;
+    }
+
+    private void uploadCsv(HttpExchange exchange) throws IOException {
+        String rawName = exchange.getRequestHeaders().getFirst("X-File-Name");
+        if (rawName == null || rawName.isBlank()) {
+            send(exchange, 400, new ApiError("X-File-Name header is required"));
+            return;
+        }
+        String fileName = URLDecoder.decode(rawName, StandardCharsets.UTF_8);
+        if (!fileName.toLowerCase(java.util.Locale.ROOT).endsWith(".csv")
+                || fileName.contains("/") || fileName.contains("\\")
+                || fileName.equals(".") || fileName.equals("..")) {
+            send(exchange, 400, new ApiError("Only CSV files with a valid filename are accepted"));
+            return;
+        }
+        byte[] body = exchange.getRequestBody().readNBytes(MAX_UPLOAD_BYTES + 1);
+        if (body.length == 0) {
+            send(exchange, 400, new ApiError("Uploaded CSV must not be empty"));
+            return;
+        }
+        if (body.length > MAX_UPLOAD_BYTES) {
+            send(exchange, 413, new ApiError("CSV exceeds the 25 MiB upload limit"));
+            return;
+        }
+        Files.createDirectories(uploadDirectory);
+        Files.createDirectories(outputDirectory);
+        Path storedFile = uploadDirectory.resolve(UUID.randomUUID() + "-" + fileName).normalize();
+        if (!storedFile.startsWith(uploadDirectory)) {
+            send(exchange, 400, new ApiError("Invalid filename"));
+            return;
+        }
+        Files.write(storedFile, body);
+        try {
+            PipelineExecutionRequest accepted = requestService.submit("cash", Map.of(
+                    "input", storedFile.toString(),
+                    "backOfficeCode", backOfficeCode,
+                    "outputDirectory", outputDirectory.toString(),
+                    "sourceFile", fileName));
+            exchange.getResponseHeaders().set("Location", "/api/executions/" + accepted.executionId());
+            send(exchange, 202, new SubmissionResponse(
+                    accepted.executionId().toString(), "QUEUED",
+                    accepted.pipelineType(), accepted.requestedAt()));
+        } catch (RuntimeException failure) {
+            Files.deleteIfExists(storedFile);
+            throw failure;
+        }
     }
 
     private void submit(HttpExchange exchange) throws IOException {
