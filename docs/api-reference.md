@@ -21,6 +21,9 @@ Optional settings:
 | `FLOWFORGE_API_DISPATCH_INTERVAL_MILLIS` | `1000` |
 | `FLOWFORGE_API_DISPATCH_BATCH_SIZE` | `50` |
 | `FLOWFORGE_API_PUBLISH_CONFIRM_TIMEOUT_MILLIS` | `5000` |
+| `FLOWFORGE_UPLOAD_DIR` | `data/uploads` |
+| `FLOWFORGE_OUTPUT_DIR` | `data/output` |
+| `FLOWFORGE_BACK_OFFICE_CODE` | `BNYM` |
 
 If `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` is configured, use the same value in the API and worker so their queue declarations match.
 
@@ -29,6 +32,7 @@ If `FLOWFORGE_RABBITMQ_DEAD_LETTER_EXCHANGE` is configured, use the same value i
 | Method and path | Purpose |
 | --- | --- |
 | `POST /api/executions` | Submit a Cash execution request. Returns `202 Accepted` with an execution ID and `QUEUED` status. |
+| `POST /api/uploads` | Upload a raw CSV request body. Set `X-File-Name` to the URL-encoded filename and `Content-Type: text/csv`. Stores the file, then enqueues a Cash execution. Maximum 25 MiB. |
 | `GET /api/executions?limit=25` | List recent executions. Limit defaults to 25 and must be between 1 and 100. |
 | `GET /api/executions/{executionId}` | Read request-delivery and execution status. |
 | `GET /api/executions/{executionId}/steps` | Read persisted step states; returns an empty list before execution starts. |
@@ -58,8 +62,8 @@ The required Cash parameters are `input`, `backOfficeCode`, and `outputDirectory
 
 ## Security and limitations
 
-This is a development API, not a public endpoint. It has no authentication, authorization, TLS termination, rate limiting, or CORS policy and binds to loopback by default. Do not expose it to an untrusted network.
+This is a development API, not a public endpoint. It has no authentication, authorization, TLS termination, rate limiting, or production-grade CORS policy and binds to loopback by default. Do not expose it to an untrusted network.
 
 The outbox dispatcher is a single-process polling loop; multiple API instances need an atomic outbox-claim/lease mechanism. A request dead-lettered before the worker creates an execution snapshot may remain reported as `DISPATCHED`; durable consumer/DLQ outcome tracking is future work.
 
-The request carries a filesystem path, not an uploaded file. A browser-facing workflow needs a secure upload and worker-accessible storage design before integration.
+The upload endpoint stores files beneath `FLOWFORGE_UPLOAD_DIR` and passes the absolute path to the Cash worker. The API and worker must share the same filesystem path (or a mounted shared volume); this first local-development implementation writes to the API host's filesystem. The dashboard's Vite origin is allowed for local development only. Uploads are not authenticated, so keep the API bound to loopback and never expose it to an untrusted network. Uploaded files are retained; configure an appropriate cleanup policy before using real or sensitive data.
