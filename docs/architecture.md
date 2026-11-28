@@ -6,7 +6,7 @@ FlowForge ETL is a modular Java 21 application that processes CSV data through o
 
 The React dashboard is a client of the REST API. It does not connect directly to SQL Server: execution data flows from SQL Server-backed repositories through the Java API and then to the frontend.
 
-## Maven modules
+## Backend Maven modules
 
 | Module | Responsibility |
 | --- | --- |
@@ -15,9 +15,12 @@ The React dashboard is a client of the REST API. It does not connect directly to
 | `flowforge-cash` | Cash workflow composition, validation, SQL persistence, local output delivery, recovery CLI, request resolver, and worker. |
 | `flowforge-messaging` | Execution request contract, JSON serialization, RabbitMQ adapters, lease-protected request handler, and outbox abstractions. |
 | `flowforge-api` | HTTP endpoints for submitting requests and querying execution history. |
-| `frontend` | React 18 / TypeScript dashboard, CSV upload, execution list, and execution details. |
 
 The core module is independent of the Cash workflow. The Cash module composes the generic engine with business-specific steps and connectors.
+
+## Frontend
+
+The `frontend` directory contains the React 18 / TypeScript dashboard. It supports CSV upload, lists recent executions, and displays execution details and persisted step history. It consumes the Java REST API; it does not access SQL Server directly.
 
 ## End-to-end execution flow
 
