@@ -17,7 +17,7 @@ The optional reconciliation schema adds expected transactions and reconciliation
 
 The diagram reflects declared foreign keys in the checked-in DDL. Cash tables share `SourceFile` as a logical correlation key, but the current scripts do not declare foreign-key constraints between those tables. The execution lease is deliberately independent of the execution audit row so a lease can be acquired before an execution snapshot is inserted.
 
-The source diagram is [`docs/diagrams/05-database-schema.mmd`](diagrams/05-database-schema.mmd).
+The editable source diagram is [`docs/diagrams/05-database-schema.mmd`](diagrams/05-database-schema.mmd).
 
 ```mermaid
 erDiagram
@@ -31,6 +31,7 @@ erDiagram
         nvarchar PipelineId
         varchar Status
         nvarchar FailedStepId
+        nvarchar ErrorMessage
         datetime2 StartedAt
         datetime2 FinishedAt
     }
@@ -41,6 +42,12 @@ erDiagram
         varchar Status
         datetime2 StartedAt
         datetime2 FinishedAt
+        nvarchar ExceptionType
+        nvarchar ErrorMessage
+        nvarchar CauseType
+        nvarchar CauseMessage
+        nvarchar SkipReason
+        varchar FailureClassification
     }
     ETLPipelineExecutionRequest {
         nvarchar ExecutionId PK
@@ -54,6 +61,8 @@ erDiagram
         varchar Status
         datetime2 CreatedAt
         datetime2 PublishedAt
+        int PublishAttempts
+        nvarchar LastError
     }
     ETLExecutionLease {
         varchar ExecutionId PK
@@ -86,7 +95,11 @@ erDiagram
         nvarchar SourceFile
         nvarchar BackOfficeCode
         bigint SourceRowNumber
+        nvarchar AccountCode
+        nvarchar AdjustmentId
+        nvarchar Currency
         decimal Amount
+        nvarchar RawRecord
         nvarchar ProcessingStatus
         nvarchar RejectionReason
         datetime2 CreatedAt
@@ -103,11 +116,12 @@ erDiagram
         varbinary CsvPayload
         char PayloadSha256
         nvarchar DeliveryStatus
+        datetime2 CreatedAt
+        datetime2 PublishedAt
+        nvarchar LastError
         nvarchar PublishedPath
         char PublishedSha256
         nvarchar PublishedExecutionId
-        datetime2 CreatedAt
-        datetime2 PublishedAt
     }
     CashExpectedTransactions {
         bigint Id PK
@@ -154,7 +168,7 @@ erDiagram
 - `dbo.CashRejected`: rejected records; `Amount` remains text so invalid source values can be preserved.
 - `dbo.T_MASTER_CASH`: row-level audit of accepted and rejected records, including source row number and raw record.
 - `dbo.CashLoadControl`: one load-control record per `SourceFile`; its primary key prevents reloading the same source-file identifier.
-- `dbo.CashOutputDelivery`: output payload, checksum, delivery status, and published artifact metadata.
+- `dbo.CashOutputDelivery`: output payload, checksum, delivery status, last error, and published artifact metadata.
 
 ### Optional reconciliation
 
