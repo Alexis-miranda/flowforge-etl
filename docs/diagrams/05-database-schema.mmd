@@ -9,6 +9,7 @@ erDiagram
         nvarchar PipelineId
         varchar Status
         nvarchar FailedStepId
+        nvarchar ErrorMessage
         datetime2 StartedAt
         datetime2 FinishedAt
     }
@@ -19,6 +20,12 @@ erDiagram
         varchar Status
         datetime2 StartedAt
         datetime2 FinishedAt
+        nvarchar ExceptionType
+        nvarchar ErrorMessage
+        nvarchar CauseType
+        nvarchar CauseMessage
+        nvarchar SkipReason
+        varchar FailureClassification
     }
     ETLPipelineExecutionRequest {
         nvarchar ExecutionId PK
@@ -32,6 +39,8 @@ erDiagram
         varchar Status
         datetime2 CreatedAt
         datetime2 PublishedAt
+        int PublishAttempts
+        nvarchar LastError
     }
     ETLExecutionLease {
         varchar ExecutionId PK
@@ -64,7 +73,11 @@ erDiagram
         nvarchar SourceFile
         nvarchar BackOfficeCode
         bigint SourceRowNumber
+        nvarchar AccountCode
+        nvarchar AdjustmentId
+        nvarchar Currency
         decimal Amount
+        nvarchar RawRecord
         nvarchar ProcessingStatus
         nvarchar RejectionReason
         datetime2 CreatedAt
@@ -81,11 +94,12 @@ erDiagram
         varbinary CsvPayload
         char PayloadSha256
         nvarchar DeliveryStatus
+        datetime2 CreatedAt
+        datetime2 PublishedAt
+        nvarchar LastError
         nvarchar PublishedPath
         char PublishedSha256
         nvarchar PublishedExecutionId
-        datetime2 CreatedAt
-        datetime2 PublishedAt
     }
     CashExpectedTransactions {
         bigint Id PK
