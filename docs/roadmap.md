@@ -2,12 +2,18 @@
 
 FlowForge is an active personal development project and a demo candidate, not a production-certified service.
 
+## Current implementation
+
+- [x] React dashboard reads recent execution records from the REST API.
+- [x] Dashboard can upload a CSV and enqueue a Cash execution for the asynchronous worker.
+- [x] API exposes execution status and persisted step history.
+- [x] SQL Server schema scripts cover Cash data, execution audit, step audit, request outbox, and execution leases.
+
 ## Before a safe public demo
 
-- [ ] Connect the dashboard to real API data and display real execution/step states.
-- [ ] Design secure input-file upload and worker-accessible storage; do not rely on a browser-supplied local filesystem path.
+- [ ] Design secure input-file upload and worker-accessible storage; do not rely on an unauthenticated browser upload endpoint or a browser-supplied local filesystem path.
 - [ ] Add authentication and authorization.
-- [ ] Define HTTPS termination, CORS policy, request limits, and rate limiting.
+- [ ] Define HTTPS termination, a production CORS policy, request limits, and rate limiting.
 - [ ] Add deployment configuration for API, worker, SQL Server, RabbitMQ, and shared/object storage.
 - [ ] Add structured logs, health/readiness checks, metrics, alerting, and operational runbooks.
 - [ ] Define backup/restore, retention, dead-letter inspection/replay, and artifact cleanup procedures.
@@ -15,6 +21,7 @@ FlowForge is an active personal development project and a demo candidate, not a 
 - [ ] Add deployed end-to-end tests using synthetic data.
 - [ ] Integrate SFTP publication into the Cash workflow if required by the target use case.
 - [ ] Confirm official input/output specifications, business mappings, and operational requirements.
+- [ ] Verify the documented ER diagram against the actual target SQL Server database and keep schema documentation synchronized with migrations.
 
 ## Outside the first demo scope
 

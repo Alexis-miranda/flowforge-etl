@@ -6,7 +6,6 @@ A modular ETL application built with **Java 21**. FlowForge processes CSV data t
   <img src="docs/images/flowforge-etl.svg" alt="FlowForge ETL" width="440" />
 </p>
 
-
 <p align="center">
   <img src="https://img.shields.io/badge/Java-21-orange?logo=openjdk&logoColor=white" alt="Java 21" />
   <img src="https://img.shields.io/badge/Maven-Multi--Module-C71A36?logo=apachemaven&logoColor=white" alt="Maven" />
@@ -22,10 +21,11 @@ A modular ETL application built with **Java 21**. FlowForge processes CSV data t
 - Publishes local output artifacts and supports recovery of pending deliveries.
 - Uses RabbitMQ and an SQL Server outbox for asynchronous execution requests.
 - Exposes a REST API for submitting requests and querying execution history.
+- Provides a React dashboard for CSV upload and execution monitoring.
 
 ## Architecture
 
-The Maven project is split into five modules:
+The Maven project is split into five backend modules and a frontend:
 
 | Module | Responsibility |
 | --- | --- |
@@ -34,6 +34,7 @@ The Maven project is split into five modules:
 | `flowforge-cash` | Cash workflow, persistence, output delivery, and worker. |
 | `flowforge-messaging` | RabbitMQ messaging, request handling, and outbox abstractions. |
 | `flowforge-api` | HTTP API. |
+| `frontend` | React/TypeScript dashboard. |
 
 See [the architecture guide](docs/architecture.md) for the execution flow and module details.
 
@@ -61,13 +62,13 @@ For database configuration, schema setup, CLI, worker, and API startup instructi
 
 ## Dashboard status
 
-The dashboard now reads recent execution records from the REST API and can upload a CSV to enqueue a Cash execution. The upload flow is intended for local development: API and worker must share the uploaded file path. Metrics and historical charts are not part of this first live-data slice.
+The dashboard reads recent execution records from the REST API, supports CSV upload to enqueue a Cash execution, and displays execution details and step history. The upload flow is intended for local development: API and worker must share the uploaded file path. Metrics and historical charts are not part of this first live-data slice.
 
-## API
+## API and security boundary
 
 The development API supports CSV uploads for Cash executions, querying recent executions, execution status, and step history. See the [API reference](docs/api-reference.md).
 
-**Security boundary:** the development API has no authentication, authorization, TLS termination, or rate limiting and binds to loopback by default. Its local-development CORS allowlist is not a production security boundary. The CSV upload endpoint stores files on the API host; keep the API private and do not use it with sensitive data until authentication, retention, and shared-storage controls are implemented.
+The development API has no authentication, authorization, TLS termination, or rate limiting and binds to loopback by default. Its local-development CORS allowlist is not a production security boundary. The CSV upload endpoint stores files on the API host; keep the API private and do not use it with sensitive data until authentication, retention, and shared-storage controls are implemented.
 
 ## Project status
 
@@ -78,8 +79,8 @@ Cash output currently targets the local filesystem. SFTP publication is not inte
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Database schema and relationships](docs/database-schema.md)
 - [Local development setup](docs/development/local-setup.md)
 - [REST API reference](docs/api-reference.md)
 - [Cash SQL schema setup](docs/cash/sql/README.md)
 - [Roadmap and release boundaries](docs/roadmap.md)
-

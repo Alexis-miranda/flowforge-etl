@@ -17,14 +17,23 @@ Run these scripts against `FlowForgeETL_Dev`, in this order:
 3. `04-cash-master-audit-schema.sql`
 4. `05-cash-load-control-schema.sql`
 5. `06-cash-output-delivery-schema.sql`
-6. `07-etl-execution-schema.sql`
-7. `../../sql/07-etl-execution-lease-independent-schema.sql` (required for asynchronous worker leases)
-8. `08-cash-output-artifact-metadata.sql`
-9. `../../sql/05-pipeline-step-execution-schema.sql` (durable step audit)
-10. `../../sql/06-pipeline-request-outbox-schema.sql` (asynchronous execution request outbox)
+6. `07-etl-execution-schema.sql` (creates the execution audit and independent worker-lease table)
+7. `08-cash-output-artifact-metadata.sql`
+8. `../../sql/05-pipeline-step-execution-schema.sql` (durable step audit; requires `dbo.ETLExecution`)
+9. `../../sql/06-pipeline-request-outbox-schema.sql` (asynchronous execution request outbox)
 
-The optional `02-cash-reconciliation-schema.sql` creates reconciliation
-tables, but the first Cash ETL workflow does not use them.
+The optional `02-cash-reconciliation-schema.sql` creates reconciliation tables and foreign keys to
+`CashStaging`; the first Cash ETL workflow does not use them.
+
+The separate `../../sql/07-etl-execution-lease-independent-schema.sql` file is a standalone,
+repeatable lease-schema script for installations that need it independently. It is already
+covered by `07-etl-execution-schema.sql` in the standard Cash setup above, so it does not need
+to be run again.
+
+The older `../../sql/04-pipeline-execution-audit-schema.sql` defines the same
+`dbo.ETLExecution` table for standalone setup. The standard Cash setup uses
+`07-etl-execution-schema.sql` instead; do not treat both files as separate tables or
+run them as competing schema versions.
 
 The scripts are intended to be repeatable for an existing installation where
 the relevant tables already exist. Review any existing table definitions
@@ -77,3 +86,6 @@ development/test database, never against production data.
 
 GitHub Actions uses a disposable SQL Server service container, initializes
 these same schema scripts, and runs the full Maven verification.
+
+For the documented table inventory, declared foreign keys, ER diagram, and
+read-only SQL examples, see [Database schema and relationships](../../database-schema.md).
