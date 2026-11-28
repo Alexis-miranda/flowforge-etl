@@ -1,0 +1,106 @@
+erDiagram
+    ETLExecution ||--o{ ETLStepExecution : "has step audit"
+    ETLPipelineExecutionRequest ||--o| ETLOutboxMessage : "creates outbox message"
+    CashStaging ||--o{ CashReconciliationResults : "optional reconciliation"
+    CashExpectedTransactions ||--o{ CashReconciliationResults : "optional match"
+
+    ETLExecution {
+        varchar ExecutionId PK
+        nvarchar PipelineId
+        varchar Status
+        nvarchar FailedStepId
+        datetime2 StartedAt
+        datetime2 FinishedAt
+    }
+    ETLStepExecution {
+        varchar ExecutionId PK, FK
+        nvarchar StepId PK
+        nvarchar StepName
+        varchar Status
+        datetime2 StartedAt
+        datetime2 FinishedAt
+    }
+    ETLPipelineExecutionRequest {
+        nvarchar ExecutionId PK
+        nvarchar PipelineType
+        datetime2 RequestedAt
+        varbinary Payload
+    }
+    ETLOutboxMessage {
+        nvarchar MessageId PK
+        nvarchar ExecutionId FK, UK
+        varchar Status
+        datetime2 CreatedAt
+        datetime2 PublishedAt
+    }
+    ETLExecutionLease {
+        varchar ExecutionId PK
+        nvarchar OwnerId
+        datetime2 LeaseUntil
+        bigint FencingToken
+    }
+    CashStaging {
+        bigint Id PK
+        nvarchar AccountCode
+        nvarchar AdjustmentId
+        nvarchar Currency
+        decimal Amount
+        nvarchar SourceFile
+        datetime2 ReceivedAt
+        nvarchar ProcessingStatus
+    }
+    CashRejected {
+        bigint Id PK
+        nvarchar AccountCode
+        nvarchar AdjustmentId
+        nvarchar Currency
+        nvarchar Amount
+        nvarchar SourceFile
+        nvarchar RejectionReason
+        datetime2 RejectedAt
+    }
+    T_MASTER_CASH {
+        bigint Id PK
+        nvarchar SourceFile
+        nvarchar BackOfficeCode
+        bigint SourceRowNumber
+        decimal Amount
+        nvarchar ProcessingStatus
+        nvarchar RejectionReason
+        datetime2 CreatedAt
+    }
+    CashLoadControl {
+        nvarchar SourceFile PK
+        datetime2 LoadedAt
+    }
+    CashOutputDelivery {
+        nvarchar SourceFile PK
+        nvarchar BackOfficeCode
+        nvarchar OutputFileName
+        nvarchar OutputDirectory
+        varbinary CsvPayload
+        char PayloadSha256
+        nvarchar DeliveryStatus
+        nvarchar PublishedPath
+        char PublishedSha256
+        nvarchar PublishedExecutionId
+        datetime2 CreatedAt
+        datetime2 PublishedAt
+    }
+    CashExpectedTransactions {
+        bigint Id PK
+        nvarchar AdjustmentId
+        nvarchar AccountCode
+        nvarchar Currency
+        decimal ExpectedAmount
+        datetime2 CreatedAt
+    }
+    CashReconciliationResults {
+        bigint Id PK
+        bigint StagingId FK
+        bigint ExpectedTransactionId FK
+        nvarchar ReconciliationStatus
+        decimal DifferenceAmount
+        nvarchar Details
+        datetime2 ReconciledAt
+    }
